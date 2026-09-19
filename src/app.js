@@ -2,6 +2,7 @@
 
 import { tabIcon, closeSheet } from './ui.js';
 import * as S from './store.js';
+import { takeInviteCode } from './invite.js';
 import * as today from './views/today.js';
 import * as sea from './views/sea.js';
 import * as together from './views/together.js';
@@ -52,6 +53,8 @@ document.addEventListener('visibilitychange', () => {
 
 /* 第一次打開先問名字。取過名字的人不會再看到這一頁。 */
 function boot() {
+  // 一進來就從網址上取走邀請碼（順手抹掉，重新整理不會再觸發一次）
+  const invite = takeInviteCode();
   const first = !S.me().name;
 
   if (first) {
@@ -63,13 +66,16 @@ function boot() {
       bar.style.display = '';
       app.style.paddingBottom = '';
       go('today');
-    });
+    }, invite);
     return;
   }
 
   let start = 'today';
   try { start = localStorage.getItem('dd_tab') || 'today'; } catch { /* 無痕模式 */ }
   go(TABS.some((t) => t.id === start) ? start : 'today');
+
+  // 老使用者點了別人的邀請連結
+  if (invite) together.promptJoin(invite, () => go('together'));
 }
 
 boot();

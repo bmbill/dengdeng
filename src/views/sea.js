@@ -57,7 +57,7 @@ export function render(root, go) {
   root.innerHTML = `
     <header class="hd">
       <div class="hd-grow">
-        <h1 class="plain">燈海</h1>
+        <h1 class="plain">璀璨燈海</h1>
         <div class="sub" data-sub></div>
       </div>
     </header>

@@ -382,6 +382,30 @@ button.sea-lamp.joined::after {
   font-weight: 500;
 }
 .welcome-form .field { font-size: 1rem; padding: 15px; }
+.welcome-invite {
+  margin-top: 18px;
+  padding: 14px 16px;
+  background: var(--card);
+  border-radius: var(--r-m);
+  box-shadow: var(--shadow);
+}
+.welcome-invite .tag { display: inline-block; }
+
+/* ── 邀請訊息預覽 ── */
+.invite-preview {
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: var(--paper-2);
+  border-radius: var(--r-m);
+  font-size: .78rem;
+  line-height: 1.9;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
 .welcome-skip {
   display: block;
   width: 100%;

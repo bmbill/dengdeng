@@ -10,6 +10,7 @@ import * as S from '../store.js';
 import * as SB from '../supabase.js';
 import { esc, icon, sheet, closeSheet, toast } from '../ui.js';
 import { renderLamp } from '../lamp.js';
+import { inviteMessage, inviteUrl, copyText, shareOrCopy } from '../invite.js';
 import { MONTHLY_GOAL, isOnlineMode } from '../config.js';
 
 let activeGroupId = null;
@@ -23,7 +24,7 @@ export function render(root, go) {
   root.innerHTML = `
     <header class="hd">
       <div class="hd-grow">
-        <h1 class="plain">同行</h1>
+        <h1 class="plain">與光同行</h1>
         <div class="sub" data-sub>${isOnlineMode() ? '載入中…' : '還沒連上伺服器'}</div>
       </div>
       <button class="avatar" data-add aria-label="加入或開一個群"
@@ -342,19 +343,73 @@ function openAddGroup(root, go) {
 
 function showCode(g) {
   const code = g.inviteCode || g.invite_code;
+  const msg = inviteMessage(g.name, code);
+
   sheet(`
-    <h2>「${esc(g.name)}」的邀請碼</h2>
-    <p class="small" style="margin-top:6px">誰有碼誰就進得來，所以不要貼在公開的地方。</p>
-    <div class="serif center" style="margin-top:18px;font-size:2rem;font-weight:700;letter-spacing:.3em;color:var(--cinnabar-d)">${esc(code)}</div>
-    <button class="btn btn-full" style="margin-top:20px" data-copy>複製邀請碼</button>
+    <h2>邀請朋友加入「${esc(g.name)}」</h2>
+    <p class="small" style="margin-top:6px">
+      整段傳給對方就好。他點開連結、取個名字，就直接進來了，不用自己找地方輸入。
+    </p>
+
+    <div class="invite-preview">${esc(msg)}</div>
+
+    <button class="btn btn-full" style="margin-top:16px" data-share>傳給朋友</button>
+    <button class="btn ghost btn-full" style="margin-top:10px" data-copy-msg>複製整段訊息</button>
+
+    <div class="row" style="margin:18px 0 12px;gap:12px">
+      <span style="flex-grow:1;height:1px;background:var(--line)"></span>
+      <span class="tiny">或者只給他邀請碼</span>
+      <span style="flex-grow:1;height:1px;background:var(--line)"></span>
+    </div>
+
+    <button class="btn ghost btn-full" data-copy-code>
+      <span class="serif" style="letter-spacing:.24em;font-weight:700">${esc(code)}</span>
+    </button>
+    <p class="small" style="margin-top:10px;color:var(--faint)">
+      誰拿到誰就進得來，不要貼在公開的地方。
+    </p>
   `, (el) => {
-    el.querySelector('[data-copy]').addEventListener('click', async () => {
+    el.querySelector('[data-share]').addEventListener('click', async () => {
+      const r = await shareOrCopy(msg);
+      if (r === 'copied') toast('已複製，貼給朋友就行');
+      else if (r === 'failed') toast('複製失敗，手動選取那段字');
+    });
+
+    el.querySelector('[data-copy-msg]').addEventListener('click', async () => {
+      toast(await copyText(msg) ? '整段複製好了' : '複製失敗，手動選取');
+    });
+
+    el.querySelector('[data-copy-code]').addEventListener('click', async () => {
+      toast(await copyText(code) ? '邀請碼複製好了' : '複製失敗，手動抄一下');
+    });
+  });
+}
+
+/** 老使用者點了別人的邀請連結。 */
+export function promptJoin(code, onDone) {
+  sheet(`
+    <h2>有人邀你加入</h2>
+    <p class="small" style="margin-top:6px">
+      邀請碼 <b class="serif" style="letter-spacing:.2em">${esc(code)}</b>。
+      加入之後，你發的燈可以選擇要不要同時亮在這個群裡。
+    </p>
+    <button class="btn btn-full" style="margin-top:18px" data-join>加入</button>
+    <button class="btn ghost btn-full" style="margin-top:10px" data-skip>先不要</button>
+  `, (el) => {
+    el.querySelector('[data-skip]').addEventListener('click', closeSheet);
+    el.querySelector('[data-join]').addEventListener('click', async () => {
       try {
-        await navigator.clipboard.writeText(code);
-        toast('複製好了');
-      } catch {
-        toast('複製失敗，手動抄一下');
+        await SB.syncProfile();
+        const g = await SB.joinGroup(code);
+        activeGroupId = g.id;
+        closeSheet();
+        toast(`加入了「${g.name}」`);
+        onDone?.();
+      } catch (e) {
+        toast(e.message || '加入失敗');
       }
     });
   });
 }
+
+export { inviteUrl };

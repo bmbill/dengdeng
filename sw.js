@@ -6,7 +6,7 @@
  * 改完程式記得把 VERSION 加一，不然舊快取不會換掉。
  */
 
-const VERSION = 'v4';
+const VERSION = 'v6';
 const CACHE = `dengdeng-${VERSION}`;
 
 const SHELL = [
@@ -28,6 +28,7 @@ const SHELL = [
   './src/views/together.js',
   './src/views/me.js',
   './src/views/welcome.js',
+  './src/invite.js',
 ];
 
 self.addEventListener('install', (e) => {

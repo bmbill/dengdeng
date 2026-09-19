@@ -2,10 +2,10 @@
  *
  * 只問一件事：要叫你什麼。
  * 不做導覽、不做分頁教學——這個 app 的門檻本來就低到不需要教，
- * 多問一句都是在消耗人家剛下載完的那點興致。
+ * 多問一句都是在消耗人家剛進來的那點興致。
  *
- * 邀請碼放在這裡，是因為朋友傳連結通常會連邀請碼一起傳，
- * 第一次進來就是最自然的時機。但它是次要的，不擋路。
+ * 帶著邀請連結進來的人（?j=CODE）會走另一條路：
+ * 取完名字直接進群，不用自己再找一次輸入框。
  */
 
 import * as S from '../store.js';
@@ -14,7 +14,9 @@ import { esc, sheet, closeSheet, toast } from '../ui.js';
 import { renderLamp } from '../lamp.js';
 import { isOnlineMode } from '../config.js';
 
-export function render(root, done) {
+export function render(root, done, invite = null) {
+  const invited = Boolean(invite && isOnlineMode());
+
   root.innerHTML = `
     <div class="welcome">
       <div class="welcome-top">
@@ -25,6 +27,11 @@ export function render(root, done) {
         <p class="welcome-lede">
           隨手記一則善行，<br>一天點一盞燈。
         </p>
+        ${invited ? `
+          <div class="welcome-invite">
+            <span class="tag rare">收到一張邀請</span>
+            <p class="small" style="margin-top:8px">取好名字就會自動加入。</p>
+          </div>` : ''}
       </div>
 
       <div class="welcome-form">
@@ -35,9 +42,11 @@ export function render(root, done) {
           同行看到的就是這個名字，之後隨時可以改。
         </p>
 
-        <button class="btn btn-full" style="margin-top:18px" data-go disabled>開始</button>
+        <button class="btn btn-full" style="margin-top:18px" data-go disabled>
+          ${invited ? '加入並開始' : '開始'}
+        </button>
 
-        ${isOnlineMode() ? `
+        ${!invited && isOnlineMode() ? `
           <button class="btn ghost btn-full" style="margin-top:10px" data-code>
             朋友給了我邀請碼
           </button>` : ''}
@@ -53,15 +62,36 @@ export function render(root, done) {
   const sync = () => { goBtn.disabled = !input.value.trim(); };
   input.addEventListener('input', sync);
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && input.value.trim()) finish(input.value, done);
+    if (e.key === 'Enter' && input.value.trim()) submit();
   });
 
-  goBtn.addEventListener('click', () => finish(input.value, done));
+  goBtn.addEventListener('click', submit);
   root.querySelector('[data-skip]').addEventListener('click', () => finish('', done));
   root.querySelector('[data-code]')?.addEventListener('click', () => openCode(input, done));
 
   // 手機上自動彈鍵盤會把版面推掉，讓使用者自己點。
   if (window.matchMedia('(min-width: 600px)').matches) input.focus();
+
+  async function submit() {
+    const name = input.value.trim();
+    if (!name) return;
+
+    if (!invited) return finish(name, done);
+
+    // 帶邀請碼進來的：先存名字再加入，不然對方看到的會是「無名」。
+    goBtn.disabled = true;
+    goBtn.textContent = '正在加入…';
+    S.setMe({ name });
+    try {
+      await SB.syncProfile();
+      const g = await SB.joinGroup(invite);
+      toast(`加入了「${g.name}」`);
+    } catch (e) {
+      // 加入失敗不該把人卡在門口。名字已經存了，進去之後還能再試。
+      toast(e.message || '加入失敗，可以稍後在同行分頁再試');
+    }
+    done();
+  }
 }
 
 function finish(name, done) {
@@ -73,7 +103,7 @@ function finish(name, done) {
   done();
 }
 
-/** 先存名字再加入，不然對方看到的會是「無名」。 */
+/** 手動輸入邀請碼。先存名字再加入，不然對方看到的會是「無名」。 */
 function openCode(input, done) {
   sheet(`
     <h2>加入同行</h2>

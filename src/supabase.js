@@ -29,18 +29,44 @@ async function client() {
   return clientPromise;
 }
 
-/** 匿名登入：不用 email、不用密碼，裝置上存一組 session。 */
+let sessionUser = null;
+
+/**
+ * 匿名登入：不用 email、不用密碼，裝置上存一組 session。
+ *
+ * 關鍵在於「驗證」那一段：getSession() 只讀本機，
+ * 不保證伺服器那邊這個帳號還在。如果帳號被刪掉（或整個專案重建），
+ * token 還留在裝置上，app 會若無其事繼續用它去寫資料，
+ * 然後爆出 foreign key violation —— 錯誤訊息完全看不出原因，
+ * 而且這台裝置從此再也寫不進東西。
+ *
+ * 所以拿到 session 之後要跟伺服器確認一次；人不在就丟掉重新登入。
+ */
 export async function ensureSession() {
   const sb = await client();
   if (!sb) return null;
+  if (sessionUser) return sessionUser;
+
   const { data: { session } } = await sb.auth.getSession();
-  if (session) return session.user;
+
+  if (session) {
+    const { data, error } = await sb.auth.getUser();
+    if (!error && data?.user) {
+      sessionUser = data.user;
+      return sessionUser;
+    }
+    console.warn('[燈燈] 本機的登入資料已失效，重新登入');
+    // scope local：伺服器那邊的帳號可能已經不在了，別再打過去
+    await sb.auth.signOut({ scope: 'local' }).catch(() => {});
+  }
+
   const { data, error } = await sb.auth.signInAnonymously();
   if (error) {
     console.warn('[燈燈] 匿名登入失敗', error.message);
     return null;
   }
-  return data.user;
+  sessionUser = data.user;
+  return sessionUser;
 }
 
 export async function myUserId() {
