@@ -93,8 +93,31 @@ if ('serviceWorker' in navigator) {
       .then((rs) => rs.forEach((r) => r.unregister()))
       .catch(() => {});
   } else {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => { /* file:// 開會失敗，不影響功能 */ });
+    // 註冊之前先記著現在有沒有 SW 在管這一頁。
+    // 第一次安裝也會觸發 controllerchange，那一次不該重載。
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let reloading = false;
+
+    window.addEventListener('load', async () => {
+      try {
+        // updateViaCache: 'none' —— 別讓瀏覽器快取 sw.js 本身。
+        // 沒有這一行，改版之後它可能好幾天都不知道有新版，
+        // 使用者會一直回報早就修好的問題。
+        const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+        reg.update().catch(() => {});
+
+        // 每次回到前景順手問一次有沒有新版
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) reg.update().catch(() => {});
+        });
+      } catch { /* file:// 開會失敗，不影響功能 */ }
+    });
+
+    // 新版接手之後重載一次，使用者才會真的看到新版。
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloading) return;
+      reloading = true;
+      location.reload();
     });
   }
 }
