@@ -181,14 +181,11 @@ export async function unpublishLamp(day) {
 /* ── 共同燈海 ── */
 
 /**
- * 一片天空：某個群在 from~to 這段日期裡的燈。
- * 200 人的群一段時間仍可能幾百盞，所以還是保留 limit，
- * 畫不完的用 groupSeaStats() 的總數據實說。
+ * 一片天空：第 p_back 片（0 = 現在這片，1 = 上一片）。
+ * 切點由資料庫依數量算出來，不存狀態，所以不會有「忘記封存」這種事。
  */
-export async function groupSea(groupId, from, to, limit = 150) {
-  const rows = await rpc('group_sea', {
-    g: groupId, p_from: from, p_to: to, p_limit: limit,
-  }, { silent: true });
+export async function groupSky(groupId, back = 0, size) {
+  const rows = await rpc('group_sky', { g: groupId, p_back: back, p_size: size }, { silent: true });
   if (!rows) return null;
   return rows.map((r) => ({
     id: r.id,
@@ -205,23 +202,24 @@ export async function groupSea(groupId, from, to, limit = 150) {
   }));
 }
 
-/** 這片天空的總數。可能比畫出來的多。 */
-export async function groupSeaStats(groupId, from, to) {
-  const rows = await rpc('group_sea_stats', { g: groupId, p_from: from, p_to: to }, { silent: true });
+/** 這片天空的概況：第幾片、滿了沒、涵蓋哪幾天。 */
+export async function groupSkyInfo(groupId, back = 0, size) {
+  const rows = await rpc('group_sky_info', { g: groupId, p_back: back, p_size: size }, { silent: true });
   const r = Array.isArray(rows) ? rows[0] : rows;
   if (!r) return null;
   return {
-    lamps: Number(r.lamps || 0),
+    skyNo: Number(r.sky_no || 1),
+    totalSkies: Number(r.total_skies || 1),
+    filled: Number(r.filled || 0),
+    size: Number(r.sky_size || 108),
+    isFull: Boolean(r.is_full),
+    fromDay: r.from_day,
+    toDay: r.to_day,
     authors: Number(r.authors || 0),
     entries: Number(r.entries || 0),
     pages: Number(r.pages || 0),
     members: Number(r.members || 0),
   };
-}
-
-/** 往回翻：上一片有燈的天空結束在哪一天。回 null 表示再往前就沒有了。 */
-export async function prevSkyDay(groupId, beforeDate) {
-  return rpc('group_sea_prev_day', { g: groupId, p_before: beforeDate }, { silent: true });
 }
 
 /** 點開某一盞燈才拉完整內容。 */

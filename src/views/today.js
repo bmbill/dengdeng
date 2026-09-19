@@ -37,7 +37,7 @@ export function render(root, go) {
     </header>
 
     <div class="view">
-      ${c.total || c.joys ? entriesCard(day, c, left) : ''}
+      ${c.total || c.joys ? entriesCard(day, c) : ''}
       ${day.sealedAt ? sealedCard(day) : actionsCard(day, c, left)}
 
       <section class="card">
@@ -71,7 +71,7 @@ export function render(root, go) {
 
 /* ── 片段 ── */
 
-function entriesCard(day, c, left) {
+function entriesCard(day, c) {
   return `
     <section class="card">
       <div class="row" style="align-items:baseline;gap:7px">
@@ -89,15 +89,6 @@ function entriesCard(day, c, left) {
         ${day.entries.map((e) => entryRow(e, day.sealedAt)).join('')}
         ${c.joys ? joyRow(day, c) : ''}
       </div>
-
-      ${day.sealedAt || left === 0 ? '' : `
-        <button class="btn ghost btn-full" style="margin-top:16px" data-write="deed">
-          再寫一則
-        </button>`}
-      ${!day.sealedAt && left === 0 ? `
-        <div class="small" style="margin-top:14px">
-          今天的三則寫完了。夠了，剩下的留給明天。
-        </div>` : ''}
     </section>
   `;
 }
@@ -132,6 +123,14 @@ function joyRow(day, c) {
   `;
 }
 
+/**
+ * 動作卡。
+ *
+ * 順序很重要：已經寫了東西的時候，「點今天的燈」要排第一。
+ * 本來它排在「再寫一則」和四個類別按鈕的後面，變成第三順位，
+ * 使用者寫完一則會以為還沒結束——真正的獎勵動作不該躲在
+ * 兩個「再多做一點」的後面。
+ */
 function actionsCard(day, c, left) {
   const kinds = [
     ['deed', '善行點滴'],
@@ -142,30 +141,32 @@ function actionsCard(day, c, left) {
 
   const canSeal = S.canSeal(day.date);
   const depth = depthOf(S.statsOf(day));
-  const nudge = !canSeal
-    ? ''
-    : left > 0 && depth < 0.95
+  const nudge = left === 0
+    ? '今天的三則寫完了。夠了，剩下的留給明天。'
+    : depth < 0.95
       ? '再寫一則，比較有機會遇到少見的燈。不寫也沒關係。'
       : '稀有的機會拉到最高了。';
 
-  const blank = !c.total && !c.joys;
-
   return `
     <section class="card">
-      ${left > 0 ? `
-        <div class="card-title">${blank ? '今天還沒寫' : '還想寫什麼'}</div>
-        ${blank ? `<p class="small" style="margin-top:7px">
-          一則短短的就好。看到什麼、做了什麼、想到誰的好，寫一句就能點今天的燈。
-        </p>` : ''}
-        <div class="row" style="margin-top:${blank ? '14px' : '12px'};gap:8px;flex-wrap:wrap">
-          ${kinds.map(([k, name]) => `<button class="btn chip" data-write="${k}">${name}</button>`).join('')}
-        </div>` : ''}
-
       ${canSeal ? `
-        <button class="btn btn-full" style="margin-top:${left > 0 ? '16px' : '0'}" data-seal>點今天的燈</button>
-        ${nudge ? `<div class="small" style="margin-top:10px">${nudge}</div>` : ''}
+        <button class="btn btn-full" data-seal>點今天的燈</button>
+        <div class="small" style="margin-top:10px">${nudge}</div>
         <div class="small" style="margin-top:6px;color:var(--faint)">點了就封存，今天不能再改。</div>
-      ` : ''}
+      ` : `
+        <div class="card-title">今天還沒寫</div>
+        <p class="small" style="margin-top:7px">
+          一則短短的就好。看到什麼、做了什麼、想到誰的好，寫一句就能點今天的燈。
+        </p>
+      `}
+
+      ${left > 0 ? `
+        <div style="margin-top:${canSeal ? '18px' : '14px'};${canSeal ? 'padding-top:16px;border-top:1px solid var(--line);' : ''}">
+          ${canSeal ? '<div class="tiny" style="margin-bottom:10px">還想寫的話</div>' : ''}
+          <div class="row" style="gap:8px;flex-wrap:wrap">
+            ${kinds.map(([k, name]) => `<button class="btn chip" data-write="${k}">${name}</button>`).join('')}
+          </div>
+        </div>` : ''}
     </section>
   `;
 }

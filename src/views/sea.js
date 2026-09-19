@@ -10,7 +10,7 @@ import * as S from '../store.js';
 import * as SB from '../supabase.js';
 import { esc, sheet, closeSheet, toast } from '../ui.js';
 import { renderLamp, renderSpark, glowOf, TIER_LABEL, BOWLS, FLAMES } from '../lamp.js';
-import { skyDaysFor, SKY_DEFAULT_DAYS, SKY_RENDER_CAP, isOnlineMode } from '../config.js';
+import { SKY_SIZE, SKY_RENDER_CAP, isOnlineMode } from '../config.js';
 
 /* 里程碑用佛教慣用的數字，不是整十整百。 */
 const MILESTONES = [
@@ -23,27 +23,10 @@ const MILESTONES = [
 
 /* 跨重繪保留的檢視狀態 */
 const view = {
-  mode: 'mine',      // 'mine' | 'group'
+  mode: 'mine',   // 'mine' | 'group'
   groupId: null,
-  skyEnd: null,      // 這片天空的最後一天，null = 到今天
+  skyBack: 0,     // 0 = 現在這片天空，1 = 上一片，依此類推
 };
-
-/* 每個群各自的「一片天空幾天」。算過一次就記著，不用每次重算。 */
-const skyDays = new Map();
-
-/**
- * 一片天空該涵蓋幾天，依這個群最近 30 天的實際發文量回推。
- * 10 人的群和 200 人的群差 20 倍，寫死一定有一邊很難看。
- */
-async function daysFor(groupId) {
-  if (skyDays.has(groupId)) return skyDays.get(groupId);
-
-  const today = S.todayStr();
-  const stats = await SB.groupSeaStats(groupId, S.shiftDate(today, -29), today);
-  const days = stats ? skyDaysFor(stats.lamps) : SKY_DEFAULT_DAYS;
-  skyDays.set(groupId, days);
-  return days;
-}
 
 export function render(root, go) {
   const groups = S.myGroups();
@@ -67,13 +50,13 @@ export function render(root, go) {
 
   root.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => {
     view.mode = b.dataset.mode;
-    view.skyEnd = null;
+    view.skyBack = 0;
     render(root, go);
   }));
 
   root.querySelector('[data-group]')?.addEventListener('change', (e) => {
     view.groupId = e.target.value;
-    view.skyEnd = null;
+    view.skyBack = 0;
     render(root, go);
   });
 
@@ -186,30 +169,26 @@ async function renderGroup(root, go) {
   sub.textContent = group ? `${group.name} · ${group.memberCount} 人` : '大家的燈海';
   body.innerHTML = `<div class="empty">正在點亮這片天空…</div>`;
 
-  const days = await daysFor(groupId);
-  const end = view.skyEnd || S.todayStr();
-  const start = S.shiftDate(end, -(days - 1));
-  const isNow = !view.skyEnd;
-
-  const [lamps, stats] = await Promise.all([
-    SB.groupSea(groupId, start, end, SKY_RENDER_CAP),
-    SB.groupSeaStats(groupId, start, end),
+  const [lamps, info] = await Promise.all([
+    SB.groupSky(groupId, view.skyBack, SKY_SIZE),
+    SB.groupSkyInfo(groupId, view.skyBack, SKY_SIZE),
   ]);
 
-  if (lamps === null) {
+  if (lamps === null || !info) {
     body.innerHTML = `<div class="empty">連不上伺服器。<br>你自己的燈還是好好地在「我的」裡面。</div>`;
     return;
   }
 
   const shown = lamps.length;
-  const total = stats ? stats.lamps : shown;
+  const isNow = view.skyBack === 0;
+  const hasPrev = view.skyBack + 1 < info.totalSkies;
 
   body.innerHTML = `
     <div class="sky-nav">
-      <button class="btn chip" data-prev aria-label="上一片天空">◀</button>
+      <button class="btn chip" data-prev aria-label="上一片天空" ${hasPrev ? '' : 'disabled'}>◀</button>
       <div class="grow center">
-        <div class="serif" style="font-size:.94rem;font-weight:600">${skyLabel(start, end)}</div>
-        <div class="tiny" style="margin-top:2px">${spanLabel(days, isNow)}</div>
+        <div class="serif" style="font-size:.94rem;font-weight:600">第 ${info.skyNo} 片天空</div>
+        <div class="tiny" style="margin-top:2px">${skyDates(info)}</div>
       </div>
       <button class="btn chip" data-next aria-label="下一片天空" ${isNow ? 'disabled' : ''}>▶</button>
     </div>
@@ -222,68 +201,77 @@ async function renderGroup(root, go) {
         : `<div class="empty" style="color:var(--night-muted);position:relative;z-index:2">這片天空還沒有燈</div>`}
       ${shown ? `<div class="sea-foot">
         <div class="grow">
-          <div class="t">這片天空 ${total} 盞</div>
-          <div class="s">${stats ? `${stats.authors} 個人${stats.pages ? ` · 誦經 ${stats.pages} 頁` : ''}` : ''}${total > shown ? ` · 畫出其中 ${shown} 盞` : ''}</div>
+          <div class="t">${info.isFull ? `這片天空滿了 · ${info.filled} 盞` : `這片天空 ${info.filled} 盞`}</div>
+          <div class="s">${info.authors} 個人${info.pages ? ` · 誦經 ${info.pages} 頁` : ''}${info.filled > shown ? ` · 畫出其中 ${shown} 盞` : ''}</div>
         </div>
       </div>` : ''}
     </div>
 
     ${shown ? `<div class="small center">點一盞燈，看看那天發生了什麼</div>` : ''}
-    ${stats ? groupStats(stats) : ''}
+    ${isNow ? fillingCard(info) : sealedCard(info)}
   `;
 
   body.querySelectorAll('[data-lamp-id]').forEach((b) => {
     b.addEventListener('click', () => openShared(b.dataset.lampId, root, go));
   });
 
-  body.querySelector('[data-prev]').addEventListener('click', async () => {
-    const prev = await SB.prevSkyDay(groupId, start);
-    if (!prev) return toast('再往前就沒有燈了');
-    view.skyEnd = prev;
+  body.querySelector('[data-prev]').addEventListener('click', () => {
+    if (!hasPrev) return toast('再往前就沒有天空了');
+    view.skyBack += 1;
     render(root, go);
   });
 
   body.querySelector('[data-next]').addEventListener('click', () => {
-    const nextEnd = S.shiftDate(end, SKY_DAYS);
-    view.skyEnd = nextEnd >= S.todayStr() ? null : nextEnd;
+    if (isNow) return;
+    view.skyBack -= 1;
     render(root, go);
   });
 }
 
-/**
- * 天數是自動算的，所以說明文字也要跟著。
- * 人少的群一片天空可能橫跨一個月，那時候寫「這幾天」是騙人的。
- */
-function spanLabel(days, isNow) {
-  if (!isNow) return '往回翻';
-  if (days <= 1) return '今天';
-  if (days <= 4) return '這幾天';
-  if (days <= 10) return `最近 ${days} 天`;
-  return `最近 ${days} 天 · 人多起來會自動縮短`;
-}
-
-function skyLabel(start, end) {
-  if (start === end) return S.prettyDate(end).split(' ·')[0];
-  const a = S.prettyDate(start).split(' ·')[0];
-  const b = S.prettyDate(end).split(' ·')[0];
+/** 這片天空涵蓋哪幾天。數量制切出來的，所以日期是結果不是條件。 */
+function skyDates(info) {
+  if (!info.fromDay) return '還沒有燈';
+  const a = S.prettyDate(info.fromDay).split(' ·')[0];
+  if (info.fromDay === info.toDay) return a;
+  const b = S.prettyDate(info.toDay).split(' ·')[0];
+  const ma = (a.match(/^(.+月)/) || [])[1];
+  const mb = (b.match(/^(.+月)/) || [])[1];
   // 同一個月就不重複月份
-  const [, ma] = a.match(/^(.+月)/) || [];
-  const [, mb] = b.match(/^(.+月)/) || [];
   return ma && ma === mb ? `${a}–${b.slice(ma.length)}` : `${a} – ${b}`;
 }
 
-function groupStats(s) {
+/** 現在這片：還在填。這是全群共同的進度，不是誰跟誰比。 */
+function fillingCard(info) {
+  const left = Math.max(0, info.size - info.filled);
+  const pct = Math.round((info.filled / info.size) * 100);
   return `
     <section class="card tight" style="background:var(--night-2)">
       <div class="row" style="align-items:baseline;gap:8px">
-        <div class="grow" style="font-size:.81rem;font-weight:500;color:var(--night-ink)">這幾天，大家一起</div>
+        <div class="grow" style="font-size:.81rem;font-weight:500;color:var(--night-ink)">這片天空</div>
+        <div class="serif" style="font-size:1.12rem;font-weight:700;color:#F2C877">${info.filled}</div>
+        <div style="font-size:.72rem;color:var(--night-muted)">/ ${info.size} 盞</div>
       </div>
-      <div class="row" style="margin-top:12px;gap:18px">
-        <div><div class="serif" style="font-size:1.25rem;font-weight:700;color:#F2C877">${s.lamps}</div><div style="font-size:.69rem;color:var(--night-muted);margin-top:2px">盞燈</div></div>
-        <div><div class="serif" style="font-size:1.25rem;font-weight:700;color:#F2C877">${s.entries}</div><div style="font-size:.69rem;color:var(--night-muted);margin-top:2px">則紀錄</div></div>
-        ${s.pages ? `<div><div class="serif" style="font-size:1.25rem;font-weight:700;color:#F2C877">${s.pages}</div><div style="font-size:.69rem;color:var(--night-muted);margin-top:2px">頁經</div></div>` : ''}
+      <div class="bar on-night" style="margin-top:11px"><i style="width:${pct}%"></i></div>
+      <div style="margin-top:10px;font-size:.72rem;color:var(--night-muted);line-height:1.7">
+        ${left ? `再 ${left} 盞就滿了，滿了會自動收起來，換新的一片` : '滿了，下一盞會開新的一片'}
+        <br>${info.authors} 個人 · ${info.entries} 則紀錄${info.pages ? ` · ${info.pages} 頁經` : ''} · 只記總數，不排名次
       </div>
-      <div style="margin-top:12px;font-size:.72rem;color:var(--night-muted);line-height:1.6">只記總數，不排名次</div>
+    </section>
+  `;
+}
+
+/** 翻回去看的舊天空：已經封存。 */
+function sealedCard(info) {
+  return `
+    <section class="card tight">
+      <div class="row" style="align-items:baseline;gap:8px">
+        <div class="grow" style="font-size:.81rem;font-weight:500">第 ${info.skyNo} 片天空 · 共 ${info.totalSkies} 片</div>
+        <div class="serif" style="font-size:1.12rem;font-weight:700;color:var(--cinnabar-d)">${info.filled}</div>
+        <div class="tiny">盞</div>
+      </div>
+      <div class="small" style="margin-top:10px">
+        ${info.authors} 個人 · ${info.entries} 則紀錄${info.pages ? ` · ${info.pages} 頁經` : ''}
+      </div>
     </section>
   `;
 }

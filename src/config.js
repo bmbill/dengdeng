@@ -40,29 +40,25 @@ export const MAX_ENTRIES_PER_DAY = 3;
  */
 export const LAMPS_PER_DAY = 1;
 
-/* ── 一片天空幾天 ──
+/* ── 一片天空 108 盞 ──
  *
- * 不寫死。10 人的群和 200 人的群差 20 倍，固定天數一定有一邊很難看。
- * 依群組最近的實際發文量回推，讓每片天空大約落在目標盞數。
+ * 數量制，不是時間制。滿了就自動封存，下一盞開新的一片。
  *
- *   畫面上舒服的密度大概是 40–120 盞：
- *   低於 20 顯得空蕩，高於 150 就糊成一片光。
+ * 為什麼不用時間切：
+ *   密度會忽高忽低。冷清的一週是空蕩蕩的天空，
+ *   熱鬧的一週糊成一片光，兩邊都不好看。
+ *
+ * 為什麼是 108：
+ *   佛教慣用的數字，而且正好落在畫面舒服的密度範圍。
+ *   40–120 盞是耐看的區間：低於 20 顯得空蕩，高於 150 就糊掉。
+ *
+ * 附帶的好處是它給出一個不是排行榜的共同目標：這片天空 87 / 108。
+ * 人多的群天空換得快，那本身就是群體動能的樣子。
  */
-export const SKY_TARGET_LAMPS = 80;
-export const SKY_MIN_DAYS = 1;
-export const SKY_MAX_DAYS = 30;
-export const SKY_DEFAULT_DAYS = 3;
+export const SKY_SIZE = 108;
 
 /** 一片天空最多畫幾盞。超過的據實說「畫出其中 N 盞」。 */
 export const SKY_RENDER_CAP = 150;
-
-/** 依最近 30 天的平均每日盞數，回推一片天空該涵蓋幾天。 */
-export function skyDaysFor(lampsLast30Days) {
-  const perDay = (lampsLast30Days || 0) / 30;
-  if (perDay <= 0) return SKY_DEFAULT_DAYS;
-  const days = Math.round(SKY_TARGET_LAMPS / perDay);
-  return Math.max(SKY_MIN_DAYS, Math.min(SKY_MAX_DAYS, days));
-}
 
 /** 預設誦的經。 */
 export const DEFAULT_SUTRA = '大般若經';

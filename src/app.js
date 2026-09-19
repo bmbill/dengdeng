@@ -1,6 +1,6 @@
 /* 燈燈悅心 — 進入點與分頁切換 */
 
-import { tabIcon, closeSheet } from './ui.js';
+import { tabIcon, closeSheet, toast } from './ui.js';
 import * as S from './store.js';
 import { takeInviteCode } from './invite.js';
 import * as today from './views/today.js';
@@ -70,9 +70,16 @@ function boot() {
     return;
   }
 
+  // 過去忘了按的燈先補上，不然那幾天會永遠空著
+  const caught = S.sealOverdue();
+
   let start = 'today';
   try { start = localStorage.getItem('dd_tab') || 'today'; } catch { /* 無痕模式 */ }
   go(TABS.some((t) => t.id === start) ? start : 'today');
+
+  if (caught.length) {
+    toast(caught.length === 1 ? '補上了前一天的燈' : `補上了 ${caught.length} 天的燈`);
+  }
 
   // 老使用者點了別人的邀請連結
   if (invite) together.promptJoin(invite, () => go('together'));

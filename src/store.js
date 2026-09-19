@@ -306,6 +306,32 @@ export function seal(date = todayStr()) {
   return saveDay(day);
 }
 
+/**
+ * 補點過去忘了按的燈。
+ *
+ * 忘記按不該讓那一天整個消失。這個 app 每一處都不懲罰中斷——
+ * 連續天數不歸零、斷了只是那天空著——唯獨這裡會因為你沒按到
+ * 就整天沒燈，前後矛盾。
+ *
+ * 只補「過去」的。今天的留給你自己按，那一下是開獎，
+ * 不該被系統搶走。
+ *
+ * @returns 補了哪幾天
+ */
+export function sealOverdue() {
+  const today = todayStr();
+  const done = [];
+
+  for (const date of Object.keys(allDays()).sort()) {
+    if (date >= today) continue;
+    const d = getDay(date);
+    if (d.sealedAt) continue;
+    if (d.entries.length < 1 && d.joys.length < 1) continue;
+    if (seal(date).lamp) done.push(date);
+  }
+  return done;
+}
+
 /* ── 統計 ── */
 
 export function lamps() {
