@@ -202,6 +202,8 @@ export function statsOf(day) {
     pages: c.pages,
     total: c.total,
     joys: c.joys,
+    // 今天寫了幾種不同的事。三種以上是難得的一天，燈身會是泥金。
+    kinds: ['deed', 'gratitude', 'sutra', 'note'].filter((k) => c[k] > 0).length,
   };
 }
 

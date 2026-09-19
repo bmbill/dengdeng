@@ -11,17 +11,42 @@
 /* ── 色盤（與 styles/tokens.css 同步） ── */
 
 export const BOWLS = {
+  // 善行點滴 —— 朱
   cinnabar:  { name: '朱砂', dark: '#C4553A', light: '#D8674C', foot: '#A9713F' },
-  azurite:   { name: '石青', dark: '#43707F', light: '#557F8F', foot: '#3B5E6B' },
+  vermilion: { name: '銀朱', dark: '#D4644A', light: '#E37B60', foot: '#B0603F' },
+  // 觀功念恩 —— 黃
   gamboge:   { name: '藤黃', dark: '#C9952F', light: '#DCAB4C', foot: '#A9713F' },
-  malachite: { name: '石綠', dark: '#4F6F4C', light: '#627F5E', foot: '#3F5A3C' },
+  orpiment:  { name: '雌黃', dark: '#B8862A', light: '#CC9C42', foot: '#96682C' },
+  // 誦經 —— 青
+  azurite:   { name: '石青', dark: '#43707F', light: '#557F8F', foot: '#3B5E6B' },
+  indigo:    { name: '螺青', dark: '#3A4A6B', light: '#4C5D80', foot: '#2E3A55' },
+  // 其他 —— 赭
   ochre:     { name: '赭石', dark: '#A9713F', light: '#BC854F', foot: '#8A6234' },
+  earth:     { name: '土黃', dark: '#B08A4E', light: '#C49E63', foot: '#8F6E3A' },
+  // 均衡 —— 綠
+  malachite: { name: '石綠', dark: '#4F6F4C', light: '#627F5E', foot: '#3F5A3C' },
+  moss:      { name: '苔綠', dark: '#6E8F6B', light: '#83A17F', foot: '#55724F' },
+  // 一天之內寫了三種不同的事，才會遇到
+  gold:      { name: '泥金', dark: '#C9A227', light: '#E0BC4A', foot: '#A07E1B' },
+};
+
+/* 一個色系兩個深淺：份量輕的是淡的那個，份量足的是深的。
+ * 顏色仍然由「你寫什麼」決定，只是多了一層「寫多少」。 */
+const BOWL_FAMILY = {
+  deed:      ['cinnabar', 'vermilion'],
+  gratitude: ['gamboge', 'orpiment'],
+  sutra:     ['azurite', 'indigo'],
+  note:      ['ochre', 'earth'],
+  balanced:  ['moss', 'malachite'],
 };
 
 export const FLAMES = {
-  gamboge:  { name: '藤黃焰', outer: '#D9A441', inner: '#C4553A', halo: '#F4D9A0' },
-  cinnabar: { name: '朱焰',   outer: '#C4553A', inner: '#F2C877', halo: '#F5A98A' },
-  white:    { name: '白焰',   outer: '#EFE7D4', inner: '#9FD4E0', halo: '#BCE3EC' },
+  gamboge:   { name: '藤黃焰', outer: '#D9A441', inner: '#C4553A', halo: '#F4D9A0' },
+  cinnabar:  { name: '朱焰',   outer: '#C4553A', inner: '#F2C877', halo: '#F5A98A' },
+  malachite: { name: '碧焰',   outer: '#6FB08C', inner: '#D9F0DF', halo: '#A8DCC0' },
+  white:     { name: '白焰',   outer: '#EFE7D4', inner: '#9FD4E0', halo: '#BCE3EC' },
+  azure:     { name: '青焰',   outer: '#6FA8C8', inner: '#E4F1F7', halo: '#A9D2E6' },
+  violet:    { name: '紫焰',   outer: '#9B7BB8', inner: '#F0E4F5', halo: '#C9B0DC' },
 };
 
 /* ── 形制 ──
@@ -34,40 +59,99 @@ export const FORMS = {
   tall:    { name: '高足燈', tier: 'common' },
   petal:   { name: '蓮瓣燈', tier: 'common' },
 
+  tripod:  { name: '三足燈', tier: 'common' },
+  tile:    { name: '瓦燈',   tier: 'common' },
+
   double:  { name: '雙層燈', tier: 'uncommon' },
   pond:    { name: '蓮池燈', tier: 'uncommon' },
   banner:  { name: '幡燈',   tier: 'uncommon' },
   handle:  { name: '提燈',   tier: 'uncommon' },
 
+  cloud:   { name: '雲座燈', tier: 'uncommon' },
+  bell:    { name: '鈴燈',   tier: 'uncommon' },
+  fish:    { name: '雙魚燈', tier: 'uncommon' },
+
   pagoda:  { name: '塔燈',   tier: 'rare' },
   seven:   { name: '七層燈', tier: 'rare' },
   mani:    { name: '摩尼燈', tier: 'rare' },
   eternal: { name: '長明燈', tier: 'rare' },
+  tree:    { name: '燈樹',   tier: 'rare' },
+  boat:    { name: '法船燈', tier: 'rare' },
+  wheel:   { name: '法輪燈', tier: 'rare' },
 };
 
 export const TIER_LABEL = { common: '常見', uncommon: '少見', rare: '難得' };
 
+/* ── 燈身紋樣 ──
+ *
+ * 這個不是抽的，是「誰供的」決定的：同一個人的燈永遠同一種紋。
+ *
+ * 為什麼要有它：形制和顏色都由當天做了什麼決定，所以一群人
+ * 做同樣的事就會供出一模一樣的燈。紋樣讓每個人的燈認得出來——
+ * 在共同燈海裡點開，一眼就知道是誰的。 */
+
+export const PATTERNS = {
+  plain:  { name: '素面' },
+  lotus:  { name: '蓮紋' },
+  cloud:  { name: '雲紋' },
+  key:    { name: '迴紋' },
+  bead:   { name: '連珠' },
+};
+
+const PATTERN_KEYS = Object.keys(PATTERNS);
+
+const PATTERN_ART = {
+  plain: '',
+  lotus: '<path d="M13.5 39.4q4.2 3.4 8.5 0M22 39.4q4.2 3.4 8.5 0" stroke="var(--light)" stroke-width="1.1" fill="none" opacity=".62" stroke-linecap="round"/>',
+  cloud: '<path d="M12 39.8q2.5-2.2 5 0t5 0 5 0 5 0" stroke="var(--light)" stroke-width="1.1" fill="none" opacity=".62" stroke-linecap="round"/>',
+  key:   [0, 1, 2, 3].map((i) => `<rect x="${13 + i * 4.8}" y="38.4" width="3.2" height="3.2" rx=".6" stroke="var(--light)" stroke-width="1" fill="none" opacity=".6"/>`).join(''),
+  bead:  [0, 1, 2, 3, 4, 5].map((i) => `<circle cx="${13 + i * 3.4}" cy="40" r="1.05" fill="var(--light)" opacity=".62"/>`).join(''),
+};
+
+/** 同一個人永遠同一種紋。 */
+export function patternFor(ownerId) {
+  return PATTERN_KEYS[hash(String(ownerId || '')) % PATTERN_KEYS.length];
+}
+
 /* ── 決定色 ── */
 
-/** 當天哪一類寫得最多 → 燈身色。份量相近就給石綠（均衡）。 */
+/**
+ * 燈身色。
+ *
+ * 色系由「你寫什麼」決定，深淺由「寫多少」決定——
+ * 顏色仍然不是抽的，只是多了一層層次，
+ * 不然一群人做同樣的事就會供出一模一樣的燈。
+ */
 export function bowlFor(day) {
+  // 一天之內寫了三種不同的事，是難得的一天，給泥金。
+  if ((day.kinds || 0) >= 3) return 'gold';
+
   // 誦經用頁數折算，不然一則 30 頁跟一則善行會被當成一樣重。
   const weighted = [
-    ['cinnabar', day.deeds || 0],
-    ['gamboge',  day.gratitude || 0],
-    ['azurite',  Math.max(day.sutras || 0, (day.pages || 0) / 5)],
-    ['ochre',    day.notes || 0],
+    ['deed',      day.deeds || 0],
+    ['gratitude', day.gratitude || 0],
+    ['sutra',     Math.max(day.sutras || 0, (day.pages || 0) / 5)],
+    ['note',      day.notes || 0],
   ].sort((a, b) => b[1] - a[1]);
 
   const [top, second] = weighted;
-  if (top[1] <= 0) return 'malachite';
-  if (second[1] > 0 && second[1] >= top[1] * 0.8) return 'malachite';
-  return top[0];
+  const deep = depthOf(day) >= 0.5 ? 1 : 0;
+
+  if (top[1] <= 0) return BOWL_FAMILY.balanced[deep];
+  if (second[1] > 0 && second[1] >= top[1] * 0.8) return BOWL_FAMILY.balanced[deep];
+  return BOWL_FAMILY[top[0]][deep];
 }
 
-/** 焰色：寫得多或誦得多給朱焰，連續七天以上給白焰。 */
+/**
+ * 焰色。連續天數優先，其次是當天的樣子。
+ * 連得越久焰色越少見——這是唯一跟「持續」有關的獎賞，
+ * 而且斷了也只是回到藤黃焰，不會失去已經供出去的燈。
+ */
 export function flameFor(day, streak) {
+  if (streak >= 49) return 'violet';
+  if (streak >= 21) return 'azure';
   if (streak >= 7) return 'white';
+  if ((day.joys || 0) >= 3) return 'malachite';
   if ((day.total || 0) >= 3 || (day.pages || 0) >= 10) return 'cinnabar';
   return 'gamboge';
 }
@@ -143,6 +227,7 @@ export function makeLamp(day, ctx = {}) {
   return {
     date: day.date,
     form, bowl, flame,
+    pattern: patternFor(seedSalt),
     tier: FORMS[form].tier,
     // 第一盞永遠叫「初發心燈」，那一刻值得一個專屬的名字。
     name: isFirstEver ? '初發心燈' : FORMS[form].name,
@@ -173,6 +258,65 @@ const FORM_ART = {
     front: '<path d="M11 33.5c-1.8 2.6-2.2 5.2-1.2 7.8 2.4-1.6 3.6-4 3.4-7.2z" fill="var(--light)"/>'
          + '<path d="M33 33.5c1.8 2.6 2.2 5.2 1.2 7.8-2.4-1.6-3.6-4-3.4-7.2z" fill="var(--light)"/>'
          + '<path d="M14.5 45.5h15" stroke="var(--foot)" stroke-width="2.4" stroke-linecap="round"/>',
+  }),
+
+  tripod: () => ({
+    behind: '',
+    front: '<path d="M13.5 43.4l-2.4 4.4M22 44v4M30.5 43.4l2.4 4.4" stroke="var(--foot)" stroke-width="2.3" stroke-linecap="round"/>',
+  }),
+
+  tile: () => ({
+    behind: '',
+    front: '<path d="M8.5 43.6h27l2.8 4.2H5.7z" fill="var(--foot)"/>',
+  }),
+
+  cloud: () => ({
+    behind: '',
+    front: '<circle cx="13.5" cy="46.2" r="4.4" fill="var(--light)"/>'
+         + '<circle cx="22" cy="45.4" r="5.4" fill="var(--light)"/>'
+         + '<circle cx="30.5" cy="46.2" r="4.4" fill="var(--light)"/>',
+  }),
+
+  bell: () => ({
+    behind: '',
+    front: '<path d="M8.6 38v5.4M35.4 38v5.4" stroke="var(--foot)" stroke-width="1.3" stroke-linecap="round"/>'
+         + '<path d="M6 48.4c0-2 1.2-3.4 2.6-3.4s2.6 1.4 2.6 3.4z" fill="var(--light)"/>'
+         + '<path d="M32.8 48.4c0-2 1.2-3.4 2.6-3.4s2.6 1.4 2.6 3.4z" fill="var(--light)"/>'
+         + '<path d="M14.5 45.5h15" stroke="var(--foot)" stroke-width="2.4" stroke-linecap="round"/>',
+  }),
+
+  fish: () => ({
+    behind: '<path d="M4.5 33.5c3.4-3.4 6.8-4 9.4-1.6-1.6 3.4-5 4.8-9.4 3.4z" fill="#9FD4E0"/>'
+          + '<path d="M39.5 33.5c-3.4-3.4-6.8-4-9.4-1.6 1.6 3.4 5 4.8 9.4 3.4z" fill="#9FD4E0"/>'
+          + '<circle cx="7.6" cy="33.4" r=".9" fill="#3B5E6B"/><circle cx="36.4" cy="33.4" r=".9" fill="#3B5E6B"/>',
+    front: '<path d="M14.5 45.5h15" stroke="var(--foot)" stroke-width="2.4" stroke-linecap="round"/>',
+  }),
+
+  tree: () => ({
+    behind: '<path d="M22 30V13M22 20l-8-5M22 20l8-5M22 26l-6.5-4M22 26l6.5-4" stroke="var(--foot)" stroke-width="1.6" stroke-linecap="round" fill="none"/>'
+          + [[14, 15], [30, 15], [15.5, 22], [28.5, 22], [22, 12]].map(([x, y]) =>
+              `<circle cx="${x}" cy="${y}" r="2.4" fill="var(--flame-outer)" opacity=".9"/>`).join(''),
+    front: '<path d="M14.5 45.5h15" stroke="var(--foot)" stroke-width="2.4" stroke-linecap="round"/>',
+  }),
+
+  boat: () => ({
+    behind: '',
+    front: '<path d="M3.5 43.4h37c-1.8 4.6-7.4 7-18.5 7S5.3 48 3.5 43.4z" fill="var(--foot)"/>'
+         + '<path d="M9 46.4h26" stroke="var(--light)" stroke-width="1.2" stroke-linecap="round" opacity=".55"/>',
+  }),
+
+  wheel: () => ({
+    behind: '<circle cx="22" cy="19" r="15" stroke="var(--flame-halo)" stroke-width="1.8" fill="none" opacity=".6"/>'
+          + '<circle cx="22" cy="19" r="4.6" stroke="var(--flame-halo)" stroke-width="1.5" fill="none" opacity=".6"/>'
+          + [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
+              const a = (Math.PI * 2 * i) / 8;
+              const x1 = (22 + Math.cos(a) * 5).toFixed(1);
+              const y1 = (19 + Math.sin(a) * 5).toFixed(1);
+              const x2 = (22 + Math.cos(a) * 14.4).toFixed(1);
+              const y2 = (19 + Math.sin(a) * 14.4).toFixed(1);
+              return `<path d="M${x1} ${y1}L${x2} ${y2}" stroke="var(--flame-halo)" stroke-width="1.3" opacity=".5"/>`;
+            }).join(''),
+    front: '<path d="M14.5 45.5h15" stroke="var(--foot)" stroke-width="2.4" stroke-linecap="round"/>',
   }),
 
   double: () => ({
@@ -258,11 +402,15 @@ export function renderLamp(lamp, opts = {}) {
 
   // xmlns 是必要的：內嵌在 HTML 裡沒差，但把這串 SVG 當成圖片載入
   // （分享圖卡會這樣做）時，少了它整張圖就不會 render。
+  // 紋樣畫在缽身上。舊資料沒有這個欄位，就當素面。
+  const pattern = lit ? (PATTERN_ART[lamp.pattern] || '') : '';
+
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${Math.round(size * 50 / 44)}" viewBox="0 0 44 50" fill="none" style="${vars}" role="img" aria-label="${lamp.name || '燈'}">
     ${art.behind}
     ${flame}
     <path d="M8 31h28c0 7.8-6.3 12.6-14 12.6S8 38.8 8 31z" fill="var(--dark)"/>
     <path d="M8 31h28c0 2.5-.7 4.7-1.9 6.5H9.9C8.7 35.7 8 33.5 8 31z" fill="var(--light)"/>
+    ${pattern}
     ${art.front}
   </svg>`;
 }

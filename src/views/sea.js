@@ -13,14 +13,62 @@ import { showMyDay, showSharedLamp } from './lampcard.js';
 import { renderLamp, renderSpark, glowOf, TIER_LABEL, BOWLS, FLAMES } from '../lamp.js';
 import { SKY_SIZE, SKY_RENDER_CAP, isOnlineMode } from '../config.js';
 
-/* 里程碑用佛教慣用的數字，不是整十整百。 */
+/* ── 里程碑 ──
+ *
+ * 每一個都要真的讓畫面出現東西。
+ * 本來只是幾行字（「再 6 盞，燈海起了風」），但 7 盞到了什麼也沒發生——
+ * 那等於 app 在承諾一件它不做的事。
+ *
+ * 現在每一階都對應夜空裡的一樣東西，文案寫的就是你會看到的。 */
+
 const MILESTONES = [
-  { at: 7, label: '燈海起了風' },
-  { at: 21, label: '習慣開始長根' },
-  { at: 49, label: '燈海浮起一座塔' },
-  { at: 108, label: '繞成一圈' },
-  { at: 365, label: '這是一整片夜空' },
+  { at: 7,   cls: 'windy', label: '燈會開始隨風飄' },
+  { at: 21,  cls: 'reeds', label: '岸邊長出草' },
+  { at: 49,  cls: 'pagoda', label: '遠處浮起一座塔' },
+  { at: 108, cls: 'moon',  label: '天上出現月亮' },
+  { at: 365, cls: 'stars', label: '滿天都是星' },
 ];
+
+/** 已經到達的階段，變成夜空的 class。 */
+function stageClasses(count) {
+  return MILESTONES.filter((m) => count >= m.at).map((m) => m.cls).join(' ');
+}
+
+/** 夜空裡那些「長出來」的東西。 */
+function scenery(count) {
+  const has = (at) => count >= at;
+  return `
+    ${has(108) ? '<span class="sky-moon"></span>' : ''}
+    ${has(365) ? starField() : ''}
+    ${has(49) ? `<svg class="sky-pagoda" viewBox="0 0 80 96" fill="none" aria-hidden="true">
+      <path d="M40 4l20 12H20z"/><path d="M26 16h28v10H26z"/>
+      <path d="M40 26l24 12H16z"/><path d="M24 38h32v12H24z"/>
+      <path d="M40 50l28 14H12z"/><path d="M22 64h36v22H22z"/>
+      <path d="M8 86h64v10H8z"/>
+    </svg>` : ''}
+    ${has(21) ? reeds() : ''}
+  `;
+}
+
+function starField() {
+  return [...Array(26)].map((_, i) => {
+    const x = (8 + 84 * ((i * 0.7548776662) % 1)).toFixed(1);
+    const y = (6 + 56 * ((i * 0.5698402909) % 1)).toFixed(1);
+    const s = (0.8 + (i % 3) * 0.5).toFixed(1);
+    return `<span class="sky-star" style="left:${x}%;top:${y}%;width:${s}px;height:${s}px;animation-delay:${(i % 7) * 0.6}s"></span>`;
+  }).join('');
+}
+
+function reeds() {
+  return `<svg class="sky-reeds" viewBox="0 0 320 40" preserveAspectRatio="none" fill="none" aria-hidden="true">
+    ${[...Array(22)].map((_, i) => {
+      const x = 6 + i * 14.6;
+      const h = 14 + ((i * 7) % 18);
+      const lean = ((i % 3) - 1) * 5;
+      return `<path d="M${x} 40C${x + lean} ${40 - h * 0.6} ${x + lean} ${40 - h * 0.85} ${x + lean * 1.6} ${40 - h}"/>`;
+    }).join('')}
+  </svg>`;
+}
 
 /* 跨重繪保留的檢視狀態 */
 const view = {
@@ -100,7 +148,8 @@ function renderMine(root, go) {
       <div class="stat"><b style="color:var(--azurite-d)">${t.pages}</b><span>頁經</span></div>
     </div>
 
-    <div class="sea">
+    <div class="sea ${stageClasses(list.length)}">
+      ${scenery(list.length)}
       ${list.length
         ? scatter(list.map((d) => ({ key: d.date, lamp: d.lamp, mineDate: d.date })))
         : `<div class="empty" style="color:var(--night-muted);position:relative;z-index:2">寫一則短短的<br>這裡就會亮起第一盞</div>`}
@@ -194,7 +243,8 @@ async function renderGroup(root, go) {
       <button class="btn chip" data-next aria-label="下一片天空" ${isNow ? 'disabled' : ''}>▶</button>
     </div>
 
-    <div class="sea">
+    <div class="sea ${stageClasses(info.filled)}">
+      ${scenery(info.filled)}
       ${shown
         ? scatter(lamps.map((l) => ({
             key: l.id, lamp: l.lamp, id: l.id, joined: l.joinedByMe, joys: l.joyCount,
