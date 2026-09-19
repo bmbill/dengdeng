@@ -267,17 +267,59 @@ button.sea-lamp:focus-visible { outline: 2px solid var(--night-ink); outline-off
 /* 地平線在底部那塊漸層的上緣。景物要站在那條線上，
    不然會被漸層和「看全部」那排壓住。 */
 .sky-reeds {
-  position: absolute; left: 0; right: 0; bottom: 92px;
-  width: 100%; height: 42px; z-index: 1;
+  /* 草要明顯比塔矮，不然塔會顯得又近又小。大約塔高的三分之一。 */
+  position: absolute; left: 0; right: 0; bottom: 94px;
+  width: 100%; height: 16px; z-index: 1;
 }
 /* 遠近兩層，近的深一點，才有厚度 */
 .grass-far { fill: #3B4E63; }
 .grass-near { fill: #2A3A4C; }
 
-/* 49 盞：遠處浮起一座塔 */
+/* 偶爾有人走過。一趟 35 秒，但四分鐘才一趟——常常出現就不稀奇了。 */
+.sky-walker {
+  /* 腳踩在草的底線，身高要比草高一點，頭才會露出來——
+     整個人埋在草裡就看不出是人了。 */
+  position: absolute; bottom: 94px; z-index: 2;
+  width: 12px; height: 21px;
+  animation: walk 240s linear infinite;
+  pointer-events: none;
+}
+/* 要比天空淺才看得見。深色剪影疊在深色夜空上會整個消失——
+   草能看見正是因為它比天空淺。 */
+.sky-walker svg { display: block; width: 100%; height: 100%; fill: #44586E; }
+.sky-walker svg { animation: bob 1.05s ease-in-out infinite; }
+
+@keyframes walk {
+  0%, 84.5% { left: -8%; opacity: 0; }
+  85.5% { left: -8%; opacity: .92; }
+  99% { left: 104%; opacity: .92; }
+  100% { left: 104%; opacity: 0; }
+}
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.2px); }
+}
+
+/* 49 盞：遠處浮起一座塔，窗裡偶爾亮燈 */
+.tower-lamp {
+  fill: #E8B45A;
+  opacity: 0;
+  filter: drop-shadow(0 0 4px rgba(232, 180, 90, .75));
+}
+/* 兩扇窗各自的週期，才不會一起亮一起滅 */
+.tower-lamp.a { animation: tower-glow 97s ease-in-out infinite; }
+.tower-lamp.b { animation: tower-glow 143s ease-in-out -52s infinite; }
+
+@keyframes tower-glow {
+  0%, 56% { opacity: 0; }
+  60%, 74% { opacity: .9; }
+  78%, 100% { opacity: 0; }
+}
+
 .sky-pagoda {
-  position: absolute; right: 9%; bottom: 96px;
-  width: 50px; height: 62px; z-index: 1;
+  /* 底座比草線高一點點，讀起來才像在更遠的地方 */
+  position: absolute; right: 9%; bottom: 100px;
+  width: 46px; height: 58px; z-index: 1;
   fill: #33455A;
 }
 

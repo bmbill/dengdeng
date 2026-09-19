@@ -23,8 +23,8 @@ import { SKY_SIZE, SKY_RENDER_CAP, isOnlineMode } from '../config.js';
 
 const MILESTONES = [
   { at: 7,   cls: 'windy', label: '燈會開始隨風飄' },
-  { at: 21,  cls: 'reeds', label: '岸邊長出草' },
-  { at: 49,  cls: 'pagoda', label: '遠處浮起一座塔' },
+  { at: 21,  cls: 'reeds', label: '岸邊長出草，偶爾有人走過' },
+  { at: 49,  cls: 'pagoda', label: '遠處浮起一座塔，塔上偶爾亮燈' },
   { at: 108, cls: 'moon',  label: '天上出現月亮' },
   { at: 365, cls: 'stars', label: '滿天都是星' },
 ];
@@ -45,8 +45,10 @@ export function scenery(count) {
       <path d="M40 26l24 12H16z"/><path d="M24 38h32v12H24z"/>
       <path d="M40 50l28 14H12z"/><path d="M22 64h36v22H22z"/>
       <path d="M8 86h64v10H8z"/>
+      <rect class="tower-lamp a" x="35" y="69" width="10" height="11" rx="1.4"/>
+      <rect class="tower-lamp b" x="36" y="41" width="8" height="7" rx="1.2"/>
     </svg>` : ''}
-    ${has(21) ? reeds() : ''}
+    ${has(21) ? walker() + reeds() : ''}
   `;
 }
 
@@ -131,6 +133,23 @@ function grassLayer(count, maxH, salt, cls) {
   }
 
   return `<path class="${cls}" d="${d} L${W} 40 Z"/>`;
+}
+
+/**
+ * 偶爾有人走過。
+ *
+ * 一趟走完大約 35 秒，但整個循環是 4 分鐘——所以多數時候畫面上沒有人，
+ * 你偶爾抬頭才會看到有個影子在走。常常出現就不稀奇了。
+ *
+ * 放在草前面（z-index 2），因為它走的是近岸；藏在草後面只會看到一顆頭。
+ */
+function walker() {
+  return `<span class="sky-walker" aria-hidden="true">
+    <svg viewBox="0 0 16 26" fill="none">
+      <circle cx="8" cy="4.2" r="3.2"/>
+      <path d="M8 7.6c-2.8 0-4.4 2.2-4.9 7L2 24h12l-1.1-9.4c-.5-4.8-2.1-7-4.9-7z"/>
+    </svg>
+  </span>`;
 }
 
 function reeds() {
