@@ -59,20 +59,41 @@ function starField() {
   }).join('');
 }
 
+/**
+ * 岸邊的草。
+ *
+ * 本來是一根根細線條，在深色天空上看起來像刮痕，不像植物——
+ * 旁邊的塔是實心剪影，一比就輸了。同一張圖裡不該有兩種畫法。
+ *
+ * 改成剪影，而且分遠近兩層：遠的矮、淺、密，近的高、深、疏。
+ * 只有一層會很平，看起來像貼上去的貼紙。
+ */
+function grassLayer(count, maxH, salt, cls) {
+  const W = 320;
+  const step = W / count;
+  let d = `M0 40`;
+
+  for (let i = 0; i < count; i++) {
+    const x = i * step;
+    // 瘦而高才像草。寬而尖會變成松林。
+    const w = step * (0.42 + ((i * 7 + salt) % 5) * 0.09);
+    const h = maxH * (0.5 + ((i * 13 + salt) % 9) / 11);
+    const lean = (((i * 5 + salt) % 7) - 3) * (w * 0.55);
+    const tip = x + w / 2 + lean;
+
+    // 兩側各自彎，葉子才不會左右對稱得像三角形
+    d += ` L${x.toFixed(1)} 40`
+       + ` Q${(x + w * 0.1 + lean * 0.4).toFixed(1)} ${(40 - h * 0.55).toFixed(1)} ${tip.toFixed(1)} ${(40 - h).toFixed(1)}`
+       + ` Q${(x + w * 0.9 + lean * 0.4).toFixed(1)} ${(40 - h * 0.45).toFixed(1)} ${(x + w).toFixed(1)} 40`;
+  }
+
+  return `<path class="${cls}" d="${d} L${W} 40 Z"/>`;
+}
+
 function reeds() {
-  // 等距等高會看起來像柵欄。用無理數步長鋪開，高矮和傾斜都錯開。
   return `<svg class="sky-reeds" viewBox="0 0 320 40" preserveAspectRatio="none" fill="none" aria-hidden="true">
-    ${[...Array(64)].map((_, i) => {
-      // 均勻鋪底再加位移：純無理數步長會結成幾叢，中間留空檔
-      const x = (i * 5) + 10 * (((i + 1) * 0.7548776662) % 1);
-      const h = 8 + ((i * 13) % 20);
-      const lean = (((i * 7) % 11) - 5) * 1.2;
-      const op = (0.45 + ((i * 5) % 6) * 0.09).toFixed(2);
-      const p1 = `${(x + lean * 0.35).toFixed(1)} ${(40 - h * 0.45).toFixed(1)}`;
-      const p2 = `${(x + lean * 0.8).toFixed(1)} ${(40 - h * 0.82).toFixed(1)}`;
-      const p3 = `${(x + lean).toFixed(1)} ${(40 - h).toFixed(1)}`;
-      return `<path d="M${x.toFixed(1)} 40C${p1} ${p2} ${p3}" opacity="${op}"/>`;
-    }).join('')}
+    ${grassLayer(40, 24, 0, 'grass-far')}
+    ${grassLayer(26, 37, 4, 'grass-near')}
   </svg>`;
 }
 
