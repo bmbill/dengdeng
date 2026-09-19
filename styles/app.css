@@ -250,15 +250,18 @@ button.sea-lamp:focus-visible { outline: 2px solid var(--night-ink); outline-off
 /* ── 夜空裡長出來的東西 ──
    每一個都對應一個里程碑。文案說會出現什麼，就真的會出現什麼。 */
 
-/* 7 盞：起風，燈開始飄 */
-.sea.windy .sea-lamp { animation: drift 11s ease-in-out infinite; }
-.sea.windy .sea-lamp:nth-child(3n) { animation-duration: 14s; animation-delay: -3s; }
-.sea.windy .sea-lamp:nth-child(3n+1) { animation-duration: 9.5s; animation-delay: -6s; }
+/* 7 盞：起風。
+   每盞燈用自己的 --w*（在 sea.js 由 hash 算出來），
+   所以幅度、節奏、回擺深淺都不同，不會整片一起擺。
+   時間曲線前快後慢：被吹走得快，飄回來得慢。 */
+.sea.windy .sea-lamp {
+  animation: drift var(--wdur, 12s) cubic-bezier(.4, 0, .3, 1) var(--wdelay, 0s) infinite;
+}
 @keyframes drift {
   0%, 100% { transform: translate(-50%, -50%); }
-  25% { transform: translate(calc(-50% + 5px), calc(-50% - 3px)); }
-  50% { transform: translate(calc(-50% + 2px), calc(-50% + 4px)); }
-  75% { transform: translate(calc(-50% - 4px), calc(-50% - 2px)); }
+  30% { transform: translate(calc(-50% + var(--w1x, 5px)), calc(-50% + var(--w1y, -3px))); }
+  55% { transform: translate(calc(-50% + var(--w2x, 3px)), calc(-50% + var(--w2y, 4px))); }
+  80% { transform: translate(calc(-50% + var(--w3x, -2px)), calc(-50% + var(--w3y, -2px))); }
 }
 
 /* 地平線在底部那塊漸層的上緣。景物要站在那條線上，

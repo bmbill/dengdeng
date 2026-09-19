@@ -74,7 +74,7 @@ document.getElementById('stages').innerHTML = STAGES.map(({ n, what }) => {
       <div class="what">${what}</div>
       <div class="sea ${stageClasses(n)}">
         ${scenery(n)}
-        ${scatter(lamps)}
+        ${scatter(lamps, { avoidMoon: n >= 108 })}
         <div class="sea-foot">
           <div class="grow">
             <div class="t">今晚亮著 ${n} 盞</div>

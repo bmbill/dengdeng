@@ -178,7 +178,7 @@ function renderMine(root, go) {
     <div class="sea ${stageClasses(list.length)}">
       ${scenery(list.length)}
       ${list.length
-        ? scatter(list.map((d) => ({ key: d.date, lamp: d.lamp, mineDate: d.date })))
+        ? scatter(list.map((d) => ({ key: d.date, lamp: d.lamp, mineDate: d.date })), { avoidMoon: list.length >= 108 })
         : `<div class="empty" style="color:var(--night-muted);position:relative;z-index:2">寫一則短短的<br>這裡就會亮起第一盞</div>`}
       ${list.length ? `<div class="sea-foot">
         <div class="grow">
@@ -275,7 +275,7 @@ async function renderGroup(root, go) {
       ${shown
         ? scatter(lamps.map((l) => ({
             key: l.id, lamp: l.lamp, id: l.id, joined: l.joinedByMe, joys: l.joyCount,
-          })))
+          })), { avoidMoon: info.filled >= 108 })
         : `<div class="empty" style="color:var(--night-muted);position:relative;z-index:2">這片天空還沒有燈</div>`}
       ${shown ? `<div class="sea-foot">
         <div class="grow">
@@ -368,7 +368,7 @@ function sealedCard(info) {
 const R2_X = 0.7548776662466927;   // 1/g
 const R2_Y = 0.5698402909980532;   // 1/g²
 
-export function scatter(items) {
+export function scatter(items, opts = {}) {
   const shown = items.slice(-SKY_RENDER_CAP);
 
   if (shown.length <= 2) {
@@ -385,19 +385,41 @@ export function scatter(items) {
       // 一百多盞的時候會看到斜向的條紋。
       const jx = ((seed % 1000) / 1000 - 0.5) * 11;
       const jy = (((seed >> 10) % 1000) / 1000 - 0.5) * 10;
-      const x = 8 + 84 * ((0.5 + n * R2_X) % 1) + jx;
-      const y = 11 + 64 * ((0.5 + n * R2_Y) % 1) + jy;
-      return { it, x, y, glow: glowOf(it.joys) };
+      let x = 8 + 84 * ((0.5 + n * R2_X) % 1) + jx;
+      let y = 11 + 64 * ((0.5 + n * R2_Y) % 1) + jy;
+      if (opts.avoidMoon) ({ x, y } = clearOfMoon(x, y, seed));
+      return { it, x, y, glow: glowOf(it.joys), seed };
     })
     .sort((a, b) => a.glow - b.glow)
-    .map(({ it, x, y, glow }) => place(it, x, y, glow))
+    .map(({ it, x, y, glow, seed }) => place(it, x, y, glow, seed))
     .join('');
 }
 
 /** 天空上的每一盞燈都可以點——不管是自己的還是別人的。 */
-function place(it, x, y, glow = 0) {
+/**
+ * 月亮周圍留白。
+ * 不然一堆燈疊在月亮上，月亮就只是一塊被蓋住的淺色。
+ * 落在範圍內的燈往外推到邊上，不是重抽——重抽會讓分布出現一個空洞。
+ */
+const MOON = { x: 17, y: 18, rx: 12.5, ry: 11.5 };
+
+function clearOfMoon(x, y, seed) {
+  const dx = (x - MOON.x) / MOON.rx;
+  const dy = (y - MOON.y) / MOON.ry;
+  const d = Math.hypot(dx, dy);
+  if (d >= 1 || d === 0) return { x, y };
+
+  // 推到邊上再多推一點點，不然所有被推開的燈會沿著邊排成一圈
+  const push = 1 + ((seed >> 20) % 100) / 220;
+  return {
+    x: MOON.x + (dx / d) * MOON.rx * push,
+    y: MOON.y + (dy / d) * MOON.ry * push,
+  };
+}
+
+function place(it, x, y, glow = 0, seed = 0) {
   const px = { common: 7, uncommon: 9, rare: 12 }[it.lamp.tier] || 7;
-  const pos = `left:${x.toFixed(1)}%;top:${y.toFixed(1)}%`;
+  const pos = `left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;${windVars(seed)}`;
   const spark = renderSpark(it.lamp, px, glow);
 
   // 自己的燈海：點了看那天寫了什麼
@@ -423,10 +445,52 @@ function place(it, x, y, glow = 0) {
             data-lamp-id="${esc(it.id)}" title="${label}" aria-label="${label}">${spark}${mark}</button>`;
 }
 
-function hashStr(s) {
-  let h = 0;
-  for (let i = 0; i < String(s).length; i++) h = (h * 31 + String(s).charCodeAt(i)) >>> 0;
-  return h;
+/**
+ * 每一盞燈自己的風。
+ *
+ * 本來所有燈跑同一條 keyframes，只有速度不同——看起來像機械擺動，
+ * 不像風。真正的風是：有一個主風向（這裡往右），但每一盞的幅度、
+ * 相位、節奏都不一樣，而且來回不對稱（被吹走得快，飄回來得慢）。
+ */
+function windVars(seed) {
+  const h = seed >>> 0;
+  const amp = 3 + (h % 9);                       // 幅度 3~11px
+  const sway = 0.45 + ((h >> 4) % 6) / 10;       // 上下相對幅度
+  const dur = 8 + ((h >> 8) % 11);               // 8~18 秒，快慢差很多才像陣風
+  const delay = -((h >> 13) % 17);               // 錯開起點，不然會一起擺
+  const back = 0.25 + ((h >> 17) % 4) / 10;      // 回擺的深淺
+
+  // 主風向往右：三個時間點都偏正，只是多寡不同
+  return [
+    `--w1x:${(amp).toFixed(1)}px`,
+    `--w1y:${(-amp * sway * 0.7).toFixed(1)}px`,
+    `--w2x:${(amp * 0.55).toFixed(1)}px`,
+    `--w2y:${(amp * sway).toFixed(1)}px`,
+    `--w3x:${(-amp * back).toFixed(1)}px`,
+    `--w3y:${(-amp * sway * 0.4).toFixed(1)}px`,
+    `--wdur:${dur}s`,
+    `--wdelay:${delay}s`,
+  ].join(';');
+}
+
+/**
+ * 字串雜湊。
+ *
+ * 一定要用會「雪崩」的混合（imul + 位移 + 互斥或），
+ * 不能用 h = h * 31 + c 那種簡單累加：連續的日期會算出連續的值，
+ * 拿去當抖動就變成一條平滑的斜坡，完全打散不了格紋——
+ * 一百多盞的時候整片會出現斜向條紋。
+ */
+function hashStr(str) {
+  let h = 2166136261 ^ String(str).length;
+  for (let i = 0; i < String(str).length; i++) {
+    h = Math.imul(h ^ String(str).charCodeAt(i), 16777619);
+    h = (h << 13) | (h >>> 19);
+  }
+  h ^= h >>> 15;
+  h = Math.imul(h, 2246822507);
+  h ^= h >>> 13;
+  return h >>> 0;
 }
 
 /* ══════════════════ 點開一盞燈 ══════════════════ */
