@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>燈燈悅心 — 五個里程碑的夜空</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/app.css">
+  <style>
+    /* 這一頁只是拿來看夜空長什麼樣子，不碰任何紀錄。 */
+    body { padding: 28px 18px 60px; }
+    .wrap { max-width: 460px; margin: 0 auto; }
+    h1 { font-family: var(--serif); font-size: 1.4rem; color: var(--cinnabar-d); letter-spacing: .08em; }
+    .lede { margin-top: 8px; font-size: .82rem; color: var(--muted); line-height: 1.9; }
+    .stage { margin-top: 30px; }
+    .stage h2 { font-family: var(--serif); font-size: 1.05rem; letter-spacing: .06em; }
+    .stage .what { margin-top: 4px; margin-bottom: 10px; font-size: .78rem; color: var(--muted); }
+    .sea { min-height: 300px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>五個里程碑的夜空</h1>
+  <p class="lede">
+    這一頁用的是 app 本身的程式和樣式，不是示意圖。<br>
+    動畫是真的在動：燈會飄、星星會閃。<br>
+    <b>這一頁不會動到你的任何紀錄。</b>
+  </p>
+  <div id="stages"></div>
+</div>
+
+<script type="module">
+import { makeLamp } from './src/lamp.js';
+import { scenery, stageClasses, scatter } from './src/views/sea.js';
+
+const STAGES = [
+  { n: 7,   what: '起風，燈開始飄' },
+  { n: 21,  what: '岸邊長出草' },
+  { n: 49,  what: '遠處浮起一座塔' },
+  { n: 108, what: '天上出現月亮' },
+  { n: 365, what: '滿天都是星' },
+];
+
+/** 造一批假的燈，只存在記憶體裡。 */
+function fakeLamps(n) {
+  const out = [];
+  for (let i = n; i >= 1; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const date = d.toISOString().slice(0, 10);
+    const streak = n - i + 1;
+    const day = {
+      date,
+      deeds: 1,
+      gratitude: i % 2 === 0 ? 1 : 0,
+      sutras: i % 3 === 0 ? 1 : 0,
+      notes: 0,
+      pages: i % 3 === 0 ? 6 + (i * 3) % 18 : 0,
+      total: 1 + (i % 2 === 0 ? 1 : 0) + (i % 3 === 0 ? 1 : 0),
+      joys: 0,
+      kinds: 1 + (i % 2 === 0 ? 1 : 0) + (i % 3 === 0 ? 1 : 0),
+    };
+    out.push({ key: date, lamp: makeLamp(day, { streak, seedSalt: 'demo' }) });
+  }
+  return out;
+}
+
+document.getElementById('stages').innerHTML = STAGES.map(({ n, what }) => {
+  const lamps = fakeLamps(n);
+  return `
+    <section class="stage">
+      <h2>${n} 盞</h2>
+      <div class="what">${what}</div>
+      <div class="sea ${stageClasses(n)}">
+        ${scenery(n)}
+        ${scatter(lamps)}
+        <div class="sea-foot">
+          <div class="grow">
+            <div class="t">今晚亮著 ${n} 盞</div>
+            <div class="s">${what}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}).join('');
+</script>
+</body>
+</html>

@@ -30,12 +30,12 @@ const MILESTONES = [
 ];
 
 /** 已經到達的階段，變成夜空的 class。 */
-function stageClasses(count) {
+export function stageClasses(count) {
   return MILESTONES.filter((m) => count >= m.at).map((m) => m.cls).join(' ');
 }
 
 /** 夜空裡那些「長出來」的東西。 */
-function scenery(count) {
+export function scenery(count) {
   const has = (at) => count >= at;
   return `
     ${has(108) ? '<span class="sky-moon"></span>' : ''}
@@ -368,7 +368,7 @@ function sealedCard(info) {
 const R2_X = 0.7548776662466927;   // 1/g
 const R2_Y = 0.5698402909980532;   // 1/g²
 
-function scatter(items) {
+export function scatter(items) {
   const shown = items.slice(-SKY_RENDER_CAP);
 
   if (shown.length <= 2) {
