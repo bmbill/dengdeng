@@ -8,7 +8,7 @@
 
 import * as S from '../store.js';
 import * as SB from '../supabase.js';
-import { esc, sheet, closeSheet, toast } from '../ui.js';
+import { esc, icon, sheet, closeSheet, toast } from '../ui.js';
 import { showMyDay, showSharedLamp } from './lampcard.js';
 import { renderLamp, renderSpark, glowOf, TIER_LABEL, BOWLS, FLAMES } from '../lamp.js';
 import { SKY_SIZE, SKY_RENDER_CAP, isOnlineMode } from '../config.js';
@@ -209,7 +209,7 @@ async function renderGroup(root, go) {
     </div>
 
     ${shown ? `<div class="small center">
-      點一盞燈，看看那天發生了什麼${lamps.some((l) => l.joinedByMe) ? '<br>外面有圈的，是你隨喜過的' : ''}
+      點一盞燈，看看那天發生了什麼${lamps.some((l) => l.joinedByMe) ? '<br>旁邊有星星的，是你隨喜過的' : ''}
     </div>` : ''}
     ${isNow ? fillingCard(info) : sealedCard(info)}
   `;
@@ -335,8 +335,13 @@ function place(it, x, y, glow = 0) {
     it.joined ? '你隨喜過' : '',
   ].filter(Boolean).join('，');
 
-  return `<button class="sea-lamp${it.joined ? ' joined' : ''}" style="${pos}"
-            data-lamp-id="${esc(it.id)}" title="${label}" aria-label="${label}">${spark}</button>`;
+  // 隨喜過的燈旁邊放一顆星 —— app 裡每個隨喜按鈕用的都是這顆，
+  // 所以它已經代表「隨喜」，不用另外學。
+  // 本來是畫一圈硬邊圓框，在一片柔光裡看起來像 UI 元件，不像那個世界的東西。
+  const mark = it.joined ? `<span class="joined-mark">${icon.joy('#FBF2E2', true)}</span>` : '';
+
+  return `<button class="sea-lamp" style="${pos}"
+            data-lamp-id="${esc(it.id)}" title="${label}" aria-label="${label}">${spark}${mark}</button>`;
 }
 
 function hashStr(s) {

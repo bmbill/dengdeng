@@ -230,11 +230,21 @@ button.sea-lamp {
   display: flex; align-items: center; justify-content: center;
 }
 button.sea-lamp:focus-visible { outline: 2px solid var(--night-ink); outline-offset: 2px; }
-button.sea-lamp.joined::after {
-  content: ""; position: absolute; left: 50%; top: 50%;
-  width: 26px; height: 26px; margin: -13px 0 0 -13px;
-  border: 1.5px solid rgba(251, 242, 226, .55); border-radius: 50%;
+
+/* 隨喜過的燈，旁邊一顆小星 —— 跟隨喜按鈕上是同一顆 */
+.sea-lamp .joined-mark {
+  position: absolute; left: 50%; top: 50%;
+  margin: -17px 0 0 4px;
+  width: 11px; height: 11px;
+  opacity: .8;
   pointer-events: none;
+  animation: twinkle 4.2s ease-in-out infinite;
+}
+.sea-lamp .joined-mark svg { display: block; width: 11px; height: 11px; }
+
+@keyframes twinkle {
+  0%, 100% { opacity: .55; transform: scale(.9); }
+  50% { opacity: .95; transform: scale(1.08); }
 }
 
 /* ── 我的／大家的 ── */
