@@ -6,21 +6,6 @@ import { renderLamp, TIER_LABEL, FLAMES, BOWLS } from '../lamp.js';
 import { sayingFor, quoteFor, citationOf } from '../quotes.js';
 import { shareCard } from '../share.js';
 
-/** 燈童：app 自己的角色，不冒名任何人。 */
-function companion(size = 38) {
-  return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" fill="none" aria-hidden="true">
-    <circle cx="32" cy="32" r="32" fill="#F3EADA"/>
-    <path d="M32 36c-8.5 0-14 5.6-15 13.2-.4 3 1 4.8 3.8 4.8h22.4c2.8 0 4.2-1.8 3.8-4.8C46 41.6 40.5 36 32 36z" fill="#C4553A"/>
-    <path d="M32 36c-2.6 0-4.9.4-6.8 1.2L32 45l6.8-7.8c-1.9-.8-4.2-1.2-6.8-1.2z" fill="#EBD3AE"/>
-    <circle cx="32" cy="24" r="12.4" fill="#F1D8B4"/>
-    <path d="M25.6 24.4q2.4-2.8 4.8 0" stroke="#2B2620" stroke-width="1.9" stroke-linecap="round"/>
-    <path d="M33.6 24.4q2.4-2.8 4.8 0" stroke="#2B2620" stroke-width="1.9" stroke-linecap="round"/>
-    <path d="M29.8 29.2q2.2 1.9 4.4 0" stroke="#2B2620" stroke-width="1.9" stroke-linecap="round"/>
-    <circle cx="23.4" cy="27.6" r="2.4" fill="#E2A08C" opacity=".75"/>
-    <circle cx="40.6" cy="27.6" r="2.4" fill="#E2A08C" opacity=".75"/>
-  </svg>`;
-}
-
 /** 「今天寫了兩則」／「今天隨喜了三盞」——只有隨喜也能點燈。 */
 function summaryLine(day) {
   const c = S.countsOf(day);
@@ -40,7 +25,7 @@ export function showReveal(day, onClose) {
   const sameForm = all.filter((d) => d.lamp.form === lamp.form).length;
   const streak = S.streakEndingAt(day.date);
 
-  const saying = sayingFor(S.statsOf(day), { streak, gapDays: S.gapDays() });
+  const { voice, line } = sayingFor(S.statsOf(day), { streak, gapDays: S.gapDays() });
   const quote = quoteFor(day.date);
 
   fullscreen(`
@@ -67,13 +52,13 @@ export function showReveal(day, onClose) {
 
     <section class="card" style="margin:26px var(--gutter) 0;animation:fade-up .5s .7s both">
       <div class="row">
-        ${companion()}
+        ${voice.art(38)}
         <div class="grow">
-          <div style="font-size:.81rem;font-weight:500">燈童捎來一句</div>
+          <div style="font-size:.81rem;font-weight:500">${esc(voice.name)}捎來一句</div>
           <div class="tiny" style="margin-top:2px">走了 ${all.length} 天${streak > 1 ? ` · 連續 ${streak} 天` : ''}</div>
         </div>
       </div>
-      <div class="quote" style="margin-top:15px">${esc(saying)}</div>
+      <div class="quote" style="margin-top:15px">${esc(line)}</div>
       ${quote ? `
         <div style="margin-top:16px;padding-top:15px;border-top:1px solid var(--line)">
           <div class="quote" style="font-size:1rem">${esc(quote.text)}</div>
