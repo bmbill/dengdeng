@@ -1,7 +1,7 @@
 /* 燈海
  *
  * 兩種看法，同一份資料：
- *   我的   — 自己點過的所有燈
+ *   我的   — 自己供過的所有燈
  *   大家的 — 共同燈海。一片天空 = 幾天，可以一片一片往回翻。
  *            點一盞燈就看得到那天的善行，可以隨喜。
  */
@@ -147,7 +147,7 @@ function recent(list) {
   const last = list.slice(-6).reverse();
   return `
     <section class="card">
-      <div class="card-title">最近點的</div>
+      <div class="card-title">最近供的</div>
       <div style="margin-top:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
         ${last.map((d) => `
           <button data-mine="${esc(d.date)}" style="border:none;background:none;padding:8px 4px;border-radius:var(--r-m);text-align:center;min-height:44px">

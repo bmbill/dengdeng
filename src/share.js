@@ -59,7 +59,7 @@ function wrap(ctx, text, maxWidth) {
  */
 export async function makeShareCard(day) {
   const lamp = day.lamp;
-  if (!lamp) throw new Error('這天還沒點燈');
+  if (!lamp) throw new Error('這天還沒供燈');
 
   // 字體沒載完就畫，會退回系統字型，整張卡的味道就沒了
   try { await document.fonts.ready; } catch { /* 不支援就算了 */ }

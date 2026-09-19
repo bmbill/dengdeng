@@ -123,7 +123,7 @@ export function setShareTargets(ids) {
  * 一天就是一串「則」。
  *
  * 刻意不做成「四格都要填滿才算數」——那比隨手寫一句難太多，
- * 是會把人累垮的那種設計。一則短短的就能點燈；多寫只是讓你
+ * 是會把人累垮的那種設計。一則短短的就能供燈；多寫只是讓你
  * 比較可能遇到少見的燈，不是門檻。
  *
  * entry = { id, kind, text, pages?, postId?, at }
@@ -214,7 +214,7 @@ export function statsOf(day) {
  */
 export function addEntry(entry, date = todayStr()) {
   const day = getDay(date);
-  // 點過燈也還能寫。「封存」封的是那盞燈的樣子，不是你這一天的紀錄——
+  // 供過燈也還能寫。「封存」封的是那盞燈的樣子，不是你這一天的紀錄——
   // 晚上做了好事卻因為中午按過按鈕就寫不進去，沒有道理。
   // 燈已經鑄好，之後寫的不會改變它。
   if (day.entries.length >= MAX_ENTRIES_PER_DAY) return { day, ok: false, reason: 'full' };
@@ -246,7 +246,7 @@ export function removeEntry(id, date = todayStr()) {
  */
 export function addJoy(lampId, meta = {}, date = todayStr()) {
   const day = getDay(date);
-  // 今天的燈已經點過了也照記。燈是鑄好了不會變，
+  // 今天的燈已經供過了也照記。燈是鑄好了不會變，
   // 但「我今天隨喜了誰」是發生過的事，沒有理由不留下來。
   if (day.joys.some((j) => j.lampId === lampId)) return day;
   day.joys.push({ lampId, ...meta, at: new Date().toISOString() });
@@ -286,7 +286,7 @@ export function setRemoteId(id, date = todayStr()) {
   return saveDay(day);
 }
 
-/* ── 封印一天，點燈 ── */
+/* ── 封印一天，供燈 ── */
 
 /** 一則就夠，或者只是隨喜了別人也算。門檻刻意壓到最低。 */
 export function canSeal(date = todayStr()) {
@@ -308,7 +308,7 @@ export function seal(date = todayStr()) {
 }
 
 /**
- * 補點過去忘了按的燈。
+ * 補供過去忘了按的燈。
  *
  * 忘記按不該讓那一天整個消失。這個 app 每一處都不懲罰中斷——
  * 連續天數不歸零、斷了只是那天空著——唯獨這裡會因為你沒按到
@@ -354,7 +354,7 @@ export function streakEndingAt(date) {
   return n;
 }
 
-/** 目前的連續天數。今天還沒點燈不算斷，從昨天起算。 */
+/** 目前的連續天數。今天還沒供燈不算斷，從昨天起算。 */
 export function currentStreak() {
   const t = todayStr();
   return getDay(t).lamp ? streakEndingAt(t) : streakEndingAt(shiftDate(t, -1));

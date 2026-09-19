@@ -25,7 +25,7 @@ export function render(root, done, invite = null) {
         </div>
         <h1>燈燈悅心</h1>
         <p class="welcome-lede">
-          隨手記一則善行，<br>一天點一盞燈。
+          隨手記一則善行，<br>一天供一盞燈。
         </p>
         ${invited ? `
           <div class="welcome-invite">

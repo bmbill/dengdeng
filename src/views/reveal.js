@@ -6,7 +6,7 @@ import { renderLamp, TIER_LABEL, FLAMES, BOWLS } from '../lamp.js';
 import { sayingFor, quoteFor, citationOf } from '../quotes.js';
 import { shareCard } from '../share.js';
 
-/** 「今天寫了兩則」／「今天隨喜了三盞」——只有隨喜也能點燈。 */
+/** 「今天寫了兩則」／「今天隨喜了三盞」——只有隨喜也能供燈。 */
 function summaryLine(day) {
   const c = S.countsOf(day);
   const parts = [];

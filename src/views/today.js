@@ -1,6 +1,6 @@
 /* 今日 —— 隨手寫一則
  *
- * 門檻刻意壓到最低：一則短短的就能點燈（只是隨喜了別人也算）。
+ * 門檻刻意壓到最低：一則短短的就能供燈（只是隨喜了別人也算）。
  * 上限 3 則。不是限制你，是為了讓「一則」還是一件事——
  * 可以無限寫的話，寫下來這個動作就不值錢了。
  */
@@ -125,7 +125,7 @@ function joyRow(day, c) {
 /**
  * 動作卡。
  *
- * 順序很重要：已經寫了東西的時候，「點今天的燈」要排第一。
+ * 順序很重要：已經寫了東西的時候，「供今天的燈」要排第一。
  * 本來它排在「再寫一則」和四個類別按鈕的後面，變成第三順位，
  * 使用者寫完一則會以為還沒結束——真正的獎勵動作不該躲在
  * 兩個「再多做一點」的後面。
@@ -142,9 +142,9 @@ function actionsCard(day, c, left) {
   const canSeal = S.canSeal(day.date);
   const depth = depthOf(S.statsOf(day));
 
-  // 點過燈之後就沒必要再催了，燈已經鑄好，寫是寫給自己的。
+  // 供過燈之後就沒必要再催了，燈已經鑄好，寫是寫給自己的。
   const nudge = sealed
-    ? '今天的燈已經點了，之後寫的不會改變它，但還是會記下來。'
+    ? '今天的燈已經供了，之後寫的不會改變它，但還是會記下來。'
     : left === 0
       ? '今天的三則寫完了。夠了，剩下的留給明天。'
       : depth < 0.95
@@ -158,16 +158,16 @@ function actionsCard(day, c, left) {
   return `
     <section class="card">
       ${canSeal ? `
-        <button class="btn btn-full" data-seal>點今天的燈</button>
+        <button class="btn btn-full" data-seal>供今天的燈</button>
         <div class="small" style="margin-top:10px">${nudge}</div>
-        <div class="small" style="margin-top:6px;color:var(--faint)">點了之後燈就固定了，但還是可以繼續寫。</div>
+        <div class="small" style="margin-top:6px;color:var(--faint)">供了之後燈就固定了，但還是可以繼續寫。</div>
       ` : sealed ? `
         <div class="card-title">還想寫什麼</div>
         <p class="small" style="margin-top:7px">${nudge}</p>
       ` : `
         <div class="card-title">今天還沒寫</div>
         <p class="small" style="margin-top:7px">
-          一則短短的就好。看到什麼、做了什麼、想到誰的好，寫一句就能點今天的燈。
+          一則短短的就好。看到什麼、做了什麼、想到誰的好，寫一句就能供今天的燈。
         </p>
       `}
 
@@ -188,7 +188,7 @@ function sealedCard(day) {
       <span class="row">
         <span style="flex-shrink:0">${renderLamp(day.lamp, { size: 34 })}</span>
         <span class="grow">
-          <span style="display:block;font-size:.81rem;font-weight:500">今天點了「${esc(day.lamp.name)}」</span>
+          <span style="display:block;font-size:.81rem;font-weight:500">今天供了「${esc(day.lamp.name)}」</span>
           <span class="small" style="display:block;margin-top:2px">按一下再看一次</span>
         </span>
       </span>
@@ -330,21 +330,21 @@ function openWrite(kind, go) {
   });
 }
 
-/* ── 點燈 ──
- * 點之前先問要不要發到群裡，以及發到哪幾個群。
+/* ── 供燈 ──
+ * 供之前先問要不要發到群裡，以及發到哪幾個群。
  * 預設沿用上次的選擇，不必每天重選。 */
 
 function openSeal(go) {
   const day = S.getDay();
   const groups = S.myGroups();
 
-  // 沒連線或還沒加入任何群，就直接點，不要拿選單煩人。
+  // 沒連線或還沒加入任何群，就直接供，不要拿選單煩人。
   if (!isOnlineMode() || groups.length === 0) return doSeal([], go);
 
   const picked = new Set(day.isPublic === false ? [] : S.shareTargets());
 
   sheet(`
-    <h2>點今天的燈</h2>
+    <h2>供今天的燈</h2>
     <p class="small" style="margin-top:6px">要讓哪幾個群看到？不選也可以，燈一樣會亮，只是只有你看得到。</p>
 
     <div class="stack" style="margin-top:16px;gap:10px">
@@ -363,7 +363,7 @@ function openSeal(go) {
       只有你寫的那幾則會送出去，誦經頁數也會算進大眾合計。
     </p>
 
-    <button class="btn btn-full" style="margin-top:16px" data-go>點燈</button>
+    <button class="btn btn-full" style="margin-top:16px" data-go>供燈</button>
   `, (el) => {
     el.querySelector('[data-go]').addEventListener('click', () => {
       const ids = [...el.querySelectorAll('[data-g]')].filter((x) => x.checked).map((x) => x.value);
@@ -386,7 +386,7 @@ function doSeal(groupIds, go) {
       .then((id) => { if (id) S.setRemoteId(id, sealed.date); })
       .catch((e) => {
         console.warn('[燈燈] 發布失敗', e.message);
-        toast('燈點好了，但還沒送到群裡');
+        toast('燈供好了，但還沒送到群裡');
       });
   }
 

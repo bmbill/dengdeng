@@ -33,7 +33,7 @@ export function inviteUrl(code) {
 /** 可以直接貼進 LINE 的一整段訊息。 */
 export function inviteMessage(groupName, code) {
   return [
-    '我在用「燈燈悅心」記每天的善行，一天點一盞燈。',
+    '我在用「燈燈悅心」記每天的善行，一天供一盞燈。',
     `一起來「${groupName}」吧：`,
     '',
     inviteUrl(code),
