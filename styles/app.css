@@ -317,9 +317,11 @@ button.sea-lamp:focus-visible { outline: 2px solid var(--night-ink); outline-off
 }
 
 .sky-pagoda {
-  /* 底座比草線高一點點，讀起來才像在更遠的地方 */
+  /* 底座比草線高一點點，讀起來才像在更遠的地方。
+     z-index 要比人影高：人從塔「後面」經過才自然，
+     不然走到塔的位置會看起來像站在塔裡面。 */
   position: absolute; right: 9%; bottom: 100px;
-  width: 46px; height: 58px; z-index: 1;
+  width: 52px; height: 74px; z-index: 3;
   fill: #33455A;
 }
 
