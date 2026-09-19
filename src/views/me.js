@@ -31,7 +31,7 @@ export function render(root, go) {
       <section class="card">
         <div class="card-title">名字</div>
         <p class="small" style="margin-top:6px">同行看到的就是這個名字。取什麼都可以。</p>
-        <input class="field" style="margin-top:12px" value="${esc(me.name)}" placeholder="例：阿安" data-name aria-label="名字">
+        <input class="field" style="margin-top:12px" value="${esc(me.name)}" placeholder="例：王福智" data-name aria-label="名字">
         <button class="btn btn-full" style="margin-top:12px" data-save-name>存起來</button>
       </section>
 

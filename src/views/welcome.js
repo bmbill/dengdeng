@@ -30,7 +30,7 @@ export function render(root, done) {
       <div class="welcome-form">
         <label class="welcome-label" for="nameInput">要怎麼稱呼你？</label>
         <input id="nameInput" class="field" maxlength="12" autocomplete="nickname"
-               placeholder="例：阿安" data-name>
+               placeholder="例：王福智" data-name>
         <p class="small" style="margin-top:10px">
           同行看到的就是這個名字，之後隨時可以改。
         </p>
