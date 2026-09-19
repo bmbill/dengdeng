@@ -1,0 +1,69 @@
+/* 燈燈悅心 — 進入點與分頁切換 */
+
+import { tabIcon, closeSheet } from './ui.js';
+import * as today from './views/today.js';
+import * as sea from './views/sea.js';
+import * as together from './views/together.js';
+import * as meView from './views/me.js';
+
+const TABS = [
+  { id: 'today', label: '今日', view: today },
+  { id: 'sea', label: '燈海', view: sea },
+  { id: 'together', label: '同行', view: together },
+  { id: 'me', label: '我', view: meView },
+];
+
+const app = document.getElementById('app');
+const bar = document.getElementById('tabbar');
+let current = 'today';
+
+function go(id) {
+  current = id;
+  closeSheet();
+  const tab = TABS.find((t) => t.id === id) || TABS[0];
+  app.scrollTop = 0;
+  window.scrollTo(0, 0);
+  tab.view.render(app, go);
+  paintBar();
+  try { localStorage.setItem('dd_tab', id); } catch { /* 無痕模式 */ }
+}
+
+function paintBar() {
+  bar.innerHTML = TABS.map((t) => `
+    <button data-tab="${t.id}" class="${t.id === current ? 'on' : ''}" aria-current="${t.id === current ? 'page' : 'false'}">
+      ${tabIcon[t.id](t.id === current)}
+      <span>${t.label}</span>
+    </button>
+  `).join('');
+  bar.querySelectorAll('[data-tab]').forEach((b) => {
+    b.addEventListener('click', () => go(b.dataset.tab));
+  });
+}
+
+/* 一天過了午夜要重畫，不然日期會停在昨天。 */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && current === 'today') go('today');
+});
+
+let start = 'today';
+try { start = localStorage.getItem('dd_tab') || 'today'; } catch { /* 無痕模式 */ }
+go(TABS.some((t) => t.id === start) ? start : 'today');
+
+/* PWA
+ * 本機開發時不註冊 service worker——它是 cache-first，
+ * 會讓你剛改好的程式看不到，每次都要手動清快取。
+ * 要在本機測離線行為的話，把下面這個 isLocal 判斷暫時拿掉。 */
+const isLocal = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+
+if ('serviceWorker' in navigator) {
+  if (isLocal) {
+    // 之前測試留下的 SW 也一併清掉，不然它會繼續攔請求。
+    navigator.serviceWorker.getRegistrations()
+      .then((rs) => rs.forEach((r) => r.unregister()))
+      .catch(() => {});
+  } else {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => { /* file:// 開會失敗，不影響功能 */ });
+    });
+  }
+}

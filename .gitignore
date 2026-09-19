@@ -1,0 +1,7 @@
+.DS_Store
+Thumbs.db
+node_modules/
+*.log
+
+# 設計稿原始檔，不影響 app 執行，要留就把這行刪掉
+design-mockup/

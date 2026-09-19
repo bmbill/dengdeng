@@ -1,0 +1,54 @@
+/* 燈燈悅心 — 設計 token
+   配色取自敦煌壁畫礦物顏料：朱砂、石青、藤黃、石綠、赭石，底色為宣紙白。
+   凡是 -d 結尾的都是加深版，專門用來承載白色文字（對比 >= 4.5:1）。 */
+
+:root {
+  /* 紙與墨 */
+  --paper: #FAF6EC;
+  --paper-2: #F4EFE3;
+  --card: #FFFFFF;
+  --ink: #2B2620;
+  --muted: #6E6456;
+  --faint: #A0937F;
+  --line: #EFE6D4;
+  --line-2: #E5D9C0;
+
+  /* 礦物色 */
+  --cinnabar: #C4553A;      /* 朱砂 — 主色 */
+  --cinnabar-d: #B04A31;
+  --cinnabar-bg: #FBEDE4;
+  --azurite: #43707F;       /* 石青 — 誦經 */
+  --azurite-d: #3D6070;
+  --azurite-bg: #E5EEF1;
+  --gamboge: #D9A441;       /* 藤黃 — 隨喜、焰色 */
+  --gamboge-d: #B4842A;
+  --gamboge-bg: #FBF1DE;
+  --malachite: #6E8F6B;     /* 石綠 — 均衡、完成 */
+  --malachite-d: #4F6F4C;
+  --malachite-bg: #EAF0E8;
+  --ochre: #A9713F;         /* 赭石 — 聞思 */
+  --ochre-d: #8A6234;
+  --ochre-bg: #F5EBD8;
+
+  /* 夜色（燈海） */
+  --night: #1E2A38;
+  --night-2: #23394A;
+  --night-ink: #FBF2E2;
+  --night-muted: #A9B5BF;
+
+  /* 形 */
+  --r-s: 13px;
+  --r-m: 18px;
+  --r-l: 22px;
+  --r-xl: 26px;
+  --shadow: 0 2px 16px rgba(120, 95, 60, .07);
+  --shadow-lg: 0 3px 18px rgba(120, 95, 60, .09);
+
+  /* 字 */
+  --serif: "Noto Serif TC", "Source Han Serif TC", serif;
+  --sans: "Noto Sans TC", "Source Han Sans TC", system-ui, sans-serif;
+
+  /* 版面 */
+  --gutter: 22px;
+  --tabbar-h: 76px;
+}
