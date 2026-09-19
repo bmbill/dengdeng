@@ -38,7 +38,7 @@ export function stageClasses(count) {
 export function scenery(count) {
   const has = (at) => count >= at;
   return `
-    ${has(108) ? '<span class="sky-moon"></span>' : ''}
+    ${has(108) ? moon() : ''}
     ${has(365) ? starField() : ''}
     ${has(49) ? `<svg class="sky-pagoda" viewBox="0 0 80 96" fill="none" aria-hidden="true">
       <path d="M40 4l20 12H20z"/><path d="M26 16h28v10H26z"/>
@@ -48,6 +48,49 @@ export function scenery(count) {
     </svg>` : ''}
     ${has(21) ? reeds() : ''}
   `;
+}
+
+/**
+ * 月亮，而且跟外面真的月亮同一個月相。
+ *
+ * 關鍵是：暗面不畫。
+ * 本來用「天空色的實心陰影」去切，等於在天空上蓋一塊不透明的深色圓，
+ * 所以暗的那半看得見，而且會擋住後面的燈。
+ * 現在用遮罩只畫亮的部分，其餘完全透明。
+ */
+function moonPhase(date = new Date()) {
+  const ref = Date.UTC(2000, 0, 6, 18, 14);        // 一個已知的朔
+  const syn = 29.530588853 * 86400000;             // 朔望月
+  let p = ((date.getTime() - ref) % syn) / syn;
+  if (p < 0) p += 1;
+  return p;                                        // 0 是朔、0.5 是望
+}
+
+let moonSeq = 0;
+
+function moon() {
+  const p = moonPhase();
+  const cosT = Math.cos(2 * Math.PI * p);
+  // 亮的比例。全黑的朔留一點點，不然「天上出現月亮」會看不到東西。
+  const k = Math.max(0.055, (1 - cosT) / 2);
+  const waxing = p < 0.5;                          // 上弦：北半球亮在右邊
+  const gibbous = k > 0.5;
+  const rx = (Math.abs(cosT) * 20).toFixed(2);
+  const id = `mn${++moonSeq}`;
+
+  // 亮的那半圓：上弦走右邊（sweep 1），下弦走左邊（sweep 0）
+  const half = `M20 0A20 20 0 0 ${waxing ? 1 : 0} 20 40Z`;
+
+  return `<span class="sky-moon">
+    <svg viewBox="0 0 40 40" aria-hidden="true">
+      <mask id="${id}">
+        <rect width="40" height="40" fill="#000"/>
+        <path d="${half}" fill="#fff"/>
+        <ellipse cx="20" cy="20" rx="${rx}" ry="20" fill="${gibbous ? '#fff' : '#000'}"/>
+      </mask>
+      <circle cx="20" cy="20" r="20" fill="#E8E2D2" mask="url(#${id})"/>
+    </svg>
+  </span>`;
 }
 
 function starField() {
@@ -376,7 +419,7 @@ export function scatter(items, opts = {}) {
   const shown = items.slice(-SKY_RENDER_CAP);
 
   if (shown.length <= 2) {
-    return shown.map((it, i) => place(it, shown.length === 1 ? 50 : 36 + i * 28, 44)).join('');
+    return shown.map((it, i) => place(it, shown.length === 1 ? 50 : 36 + i * 28, 36)).join('');
   }
 
   // 亮的燈最後畫，才會疊在上面。
@@ -390,7 +433,8 @@ export function scatter(items, opts = {}) {
       const jx = ((seed % 1000) / 1000 - 0.5) * 11;
       const jy = (((seed >>> 10) % 1000) / 1000 - 0.5) * 10;
       let x = 8 + 84 * ((0.5 + n * R2_X) % 1) + jx;
-      let y = 11 + 64 * ((0.5 + n * R2_Y) % 1) + jy;
+      // 上限壓在地平線以上：草是前景，燈是天上的，掉到草裡就不對了
+      let y = 10 + 50 * ((0.5 + n * R2_Y) % 1) + jy;
       if (opts.avoidMoon) ({ x, y } = clearOfMoon(x, y, seed));
       return { it, x, y, glow: glowOf(it.joys), seed };
     })
