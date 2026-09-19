@@ -107,7 +107,7 @@ function entryRow(e, sealed) {
   `;
 }
 
-/** 隨喜單獨一列，而且明說不佔額度。 */
+/** 隨喜單獨一列。要講清楚它不算在那 3 則裡，不然會以為自己寫超過了。 */
 function joyRow(day, c) {
   const names = [...new Set(day.joys.map((j) => j.authorName).filter(Boolean))];
   return `
@@ -117,7 +117,7 @@ function joyRow(day, c) {
         <span class="task-name" style="display:block">隨喜 ${c.joys} 盞</span>
         <span class="task-val truncate" style="display:block">${names.length ? esc(names.join('、')) : '大家的燈'}</span>
       </span>
-      <span class="tiny">不佔額度</span>
+      <span class="tiny">不算在 3 則裡</span>
     </div>
   `;
 }

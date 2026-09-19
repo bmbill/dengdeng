@@ -56,16 +56,64 @@ export function toast(msg) {
 
 /* ── 底部彈層 ── */
 
+/**
+ * 讓彈層閃開手機鍵盤。
+ *
+ * 彈層是 position:fixed 貼著底邊的。手機鍵盤彈出來的時候，
+ * visual viewport（看得到的那塊）縮小了，但 layout viewport 沒有變，
+ * 所以固定定位的東西還是貼在原來的底邊 —— 整個被壓在鍵盤下面，
+ * 使用者看不到自己在打什麼。
+ *
+ * 解法是量出鍵盤蓋住多少，把容器的下緣墊起來。
+ * 墊在外層容器而不是彈層本身，才不會跟滑入動畫的 transform 打架。
+ */
+function dodgeKeyboard(bg, sheetEl) {
+  const vv = window.visualViewport;
+  if (!vv) return () => {};
+
+  const apply = () => {
+    const overlap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    bg.style.paddingBottom = overlap ? `${overlap}px` : '';
+    // 鍵盤佔掉一半螢幕時，彈層自己也要縮，不然上半截會被推出畫面
+    sheetEl.style.maxHeight = `${Math.max(220, vv.height - 24)}px`;
+  };
+
+  vv.addEventListener('resize', apply);
+  vv.addEventListener('scroll', apply);
+  apply();
+
+  return () => {
+    vv.removeEventListener('resize', apply);
+    vv.removeEventListener('scroll', apply);
+  };
+}
+
 export function sheet(html, onMount, opts = {}) {
-  close();
+  // 關掉上一個彈層。這裡一定要用 closeSheet()，不能用底下的 close()——
+  // close() 會碰到還沒初始化的 unbind，整個彈層系統會擲 TDZ 錯。
+  closeSheet();
+
   const bg = document.createElement('div');
   bg.className = 'sheet-bg';
   bg.innerHTML = `<div class="sheet ${opts.className || ''}" role="dialog" aria-modal="true">${html}</div>`;
   bg.addEventListener('click', (e) => { if (e.target === bg) close(); });
   document.body.appendChild(bg);
-  onMount?.(bg.querySelector('.sheet'), close);
+
+  const sheetEl = bg.querySelector('.sheet');
+  const unbind = dodgeKeyboard(bg, sheetEl);
+
+  // 游標進到輸入框時，確保那一格真的在畫面上
+  sheetEl.addEventListener('focusin', (e) => {
+    const f = e.target;
+    if (!f.matches('input, textarea')) return;
+    // 等鍵盤把版面推完再捲，不然捲了也是白捲
+    setTimeout(() => f.scrollIntoView({ block: 'center', behavior: 'smooth' }), 280);
+  });
+
+  onMount?.(sheetEl, close);
 
   function close() {
+    unbind?.();
     document.querySelector('.sheet-bg')?.remove();
   }
   return close;

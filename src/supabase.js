@@ -222,6 +222,30 @@ export async function groupSkyInfo(groupId, back = 0, size) {
   };
 }
 
+/**
+ * 同行清單：帶著內文和回應的最近幾盞。
+ * 跟 groupSky 分開，是因為燈海只要畫光點，不需要每盞都拉內文——
+ * 200 人的群那樣拉一個月會多吃掉將近 1GB 的免費流量。
+ */
+export async function groupFeed(groupId, limit = 30) {
+  const rows = await rpc('group_feed', { g: groupId, p_limit: limit }, { silent: true });
+  if (!rows) return null;
+  return rows.map((r) => ({
+    id: r.id,
+    date: r.day,
+    lamp: r.lamp,
+    entries: r.entries || [],
+    entryCount: r.entry_count,
+    pages: r.pages,
+    authorName: r.author_name || '無名',
+    authorChar: r.author_char || '燈',
+    authorId: r.author_id,
+    joyCount: Number(r.joy_count || 0),
+    joinedByMe: Boolean(r.joined_by_me),
+    replies: r.replies || [],
+  }));
+}
+
 /** 點開某一盞燈才拉完整內容。 */
 export async function lampDetail(lampId) {
   const rows = await rpc('lamp_detail', { l: lampId }, { silent: true });

@@ -9,9 +9,7 @@
 import * as S from '../store.js';
 import * as SB from '../supabase.js';
 import { esc, icon, sheet, closeSheet, toast } from '../ui.js';
-import { renderLamp } from '../lamp.js';
 import { inviteMessage, inviteUrl, copyText, shareOrCopy } from '../invite.js';
-import { showSharedLamp } from './lampcard.js';
 import { SKY_SIZE, isOnlineMode } from '../config.js';
 
 let activeGroupId = null;
@@ -73,8 +71,9 @@ async function load(root, go) {
     sub.textContent = `${groups.length} 個群 · ${group.memberCount} 人`;
 
     // 跟「燈海 → 大家的」同一份資料，只是這裡用讀的。
+    const myId = await SB.myUserId();
     const [feed, info] = await Promise.all([
-      SB.groupSky(activeGroupId, 0, SKY_SIZE),
+      SB.groupFeed(activeGroupId, 30),
       SB.groupSkyInfo(activeGroupId, 0, SKY_SIZE),
     ]);
 
@@ -92,8 +91,8 @@ async function load(root, go) {
       ${info ? progressCard(info) : ''}
 
       ${feed.length
-        ? feed.map(lampRow).join('')
-        : `<div class="empty">這片天空還沒有人公開紀錄。<br>你可以是第一個。</div>`}
+        ? feed.map((l) => feedCard(l, myId)).join('')
+        : `<div class="empty">最近還沒有人公開紀錄。<br>你可以是第一個。</div>`}
 
       <div class="small center" style="padding:2px 10px 0">
         你的紀錄預設只有自己看得到 · 隨喜別人，你的燈也會亮一點
@@ -111,8 +110,11 @@ async function load(root, go) {
 
     body.querySelector('[data-invite]').addEventListener('click', () => showCode(group));
 
-    body.querySelectorAll('[data-lamp]').forEach((b) => {
-      b.addEventListener('click', () => openLamp(b.dataset.lamp, root, go));
+    body.querySelectorAll('[data-joy]').forEach((b) => {
+      b.addEventListener('click', () => onJoy(b, feed.find((x) => x.id === b.dataset.joy)));
+    });
+    body.querySelectorAll('[data-reply]').forEach((b) => {
+      b.addEventListener('click', () => openReply(feed.find((x) => x.id === b.dataset.reply), root, go));
     });
   } catch (e) {
     console.warn('[燈燈] 同行載入失敗', e);
@@ -143,27 +145,50 @@ function progressCard(info) {
   `;
 }
 
-function lampRow(l) {
+/**
+ * 同行的一張卡。
+ *
+ * 這一頁是「用讀的」，所以善行全文要直接看得到，隨喜也要當場能按。
+ * 本來整張卡是個按鈕、內文要點進去才看得到、還畫了一盞佔位子的燈——
+ * 那是燈海該做的事，不是清單。
+ */
+function feedCard(l, myId) {
+  const mine = l.authorId === myId;
+
   return `
-    <button class="card tight" data-lamp="${esc(l.id)}"
-            style="width:100%;text-align:left;border:none;cursor:pointer">
-      <span class="row">
-        <span class="avatar" style="width:34px;height:34px;border-radius:17px;font-size:.88rem">${esc(l.authorChar)}</span>
+    <section class="card tight">
+      <div class="row">
+        <span class="avatar" style="width:34px;height:34px;border-radius:17px;font-size:.88rem;flex-shrink:0">${esc(l.authorChar)}</span>
         <span class="grow">
-          <span style="display:block;font-size:.78rem;font-weight:500">${esc(l.authorName)}</span>
-          <span class="tiny" style="display:block;margin-top:1px">${when(l.date)} · ${l.entryCount} 則${l.pages ? ` · ${l.pages} 頁` : ''}</span>
+          <span style="display:block;font-size:.81rem;font-weight:500">${esc(l.authorName)}${mine ? '（你）' : ''}</span>
+          <span class="tiny" style="display:block;margin-top:1px">${when(l.date)}${l.pages ? ` · 誦經 ${l.pages} 頁` : ''}</span>
         </span>
-        <span style="flex-shrink:0">${renderLamp(l.lamp, { size: 34 })}</span>
-      </span>
-      <span class="post-acts" style="margin-top:12px">
-        <span class="btn chip ${l.joinedByMe ? 'on' : ''}" style="pointer-events:none">
-          ${icon.joy(l.joinedByMe ? '#B04A31' : '#8A8073', l.joinedByMe)} 隨喜 ${l.joyCount}
-        </span>
-        ${l.replyCount ? `<span class="tiny">${l.replyCount} 則回應</span>` : ''}
-        <span class="grow"></span>
-        <span class="tiny">${esc(l.lamp.name)}</span>
-      </span>
-    </button>
+      </div>
+
+      <div class="stack" style="margin-top:12px;gap:11px">
+        ${l.entries.length
+          ? l.entries.map((e) => `
+            <div class="entry">
+              <div class="entry-kind">${esc(S.KINDS[e.kind]?.name || '紀錄')}${e.pages ? ` · ${e.pages} 頁` : ''}</div>
+              <div class="entry-text" style="font-size:.88rem">${esc(e.text)}</div>
+            </div>`).join('')
+          : '<div class="small">這天沒有公開內容，只有一盞燈。</div>'}
+      </div>
+
+      ${l.replies.length ? `<div class="echo">
+        ${l.replies.map((r) => `<div class="post-reply"><b>${esc(r.name || '無名')}</b>　${esc(r.body)}</div>`).join('')}
+      </div>` : ''}
+
+      <div class="post-acts">
+        ${mine
+          ? `<span class="small">${l.joyCount ? `${l.joyCount} 個人隨喜了` : '還沒有人隨喜'}</span>`
+          : `<button class="btn chip ${l.joinedByMe ? 'on' : ''}" data-joy="${esc(l.id)}" data-on="${l.joinedByMe ? '1' : '0'}">
+               ${icon.joy(l.joinedByMe ? '#B04A31' : '#8A8073', l.joinedByMe)}
+               <span data-count>隨喜 ${l.joyCount}</span>
+             </button>
+             <button class="btn chip" data-reply="${esc(l.id)}">留言</button>`}
+      </div>
+    </section>
   `;
 }
 
@@ -203,11 +228,57 @@ function noGroupNotice() {
   `;
 }
 
-/* ── 一盞燈 ── */
-// 跟燈海點開的是同一張小卡，見 lampcard.js
+/* ── 就地互動 ── */
 
-function openLamp(lampId, root, go) {
-  showSharedLamp(lampId, () => render(root, go));
+async function onJoy(btn, l) {
+  if (!l) return;
+  const on = btn.dataset.on === '1';
+  btn.disabled = true;
+  try {
+    const now = await SB.toggleJoy(l.id, !on);
+    btn.dataset.on = now ? '1' : '0';
+    btn.classList.toggle('on', now);
+    const label = btn.querySelector('[data-count]');
+    const n = Number(label.textContent.replace(/\D/g, '')) + (now ? 1 : -1);
+    label.textContent = `隨喜 ${Math.max(0, n)}`;
+
+    // 隨喜不佔你今天那 3 則 —— 那 3 則是你寫下來的，這是你給出去的。
+    if (now) {
+      S.addJoy(l.id, { authorName: l.authorName, date: l.date });
+      toast(S.getDay().sealedAt ? '隨喜了' : '隨喜了，你今天的燈也亮一點');
+    } else {
+      S.removeJoy(l.id);
+    }
+  } catch (e) {
+    toast(e.message || '隨喜失敗');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function openReply(l, root, go) {
+  if (!l) return;
+  sheet(`
+    <h2>想跟${esc(l.authorName)}說什麼</h2>
+    <p class="small" style="margin-top:6px">最多 60 字。這裡不是討論區，一句就好。</p>
+    <textarea class="field" rows="3" maxlength="60" style="margin-top:14px" placeholder="例：五頁也是五頁，隨喜。"></textarea>
+    <button class="btn btn-full" style="margin-top:16px" data-send>送出</button>
+  `, (el) => {
+    const ta = el.querySelector('textarea');
+    ta.focus();
+    el.querySelector('[data-send]').addEventListener('click', async () => {
+      const t = ta.value.trim();
+      if (!t) return toast('寫一句再送');
+      try {
+        await SB.reply(l.id, t);
+        closeSheet();
+        toast('送出了');
+        render(root, go);
+      } catch (e) {
+        toast(e.message || '送不出去');
+      }
+    });
+  });
 }
 
 /* ── 群組 ── */

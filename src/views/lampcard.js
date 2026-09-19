@@ -124,7 +124,7 @@ export async function showSharedLamp(lampId, onChange) {
         : `<button class="btn chip ${d.joinedByMe ? 'on' : ''}" data-joy data-on="${d.joinedByMe ? '1' : '0'}">
              <span data-count>隨喜 ${d.joyCount}</span>
            </button>
-           <button class="btn chip" data-reply>說一句</button>`}
+           <button class="btn chip" data-reply>留言</button>`}
     </div>
 
     ${lampFootnote(d.lamp)}
@@ -163,7 +163,7 @@ async function onJoy(btn, d, onChange) {
 
 function openReply(d, onChange) {
   sheet(`
-    <h2>說一句</h2>
+    <h2>想跟他說什麼</h2>
     <p class="small" style="margin-top:6px">最多 60 字。這裡不是討論區，一句就好。</p>
     <textarea class="field" rows="3" maxlength="60" style="margin-top:14px" placeholder="例：五頁也是五頁，隨喜。"></textarea>
     <button class="btn btn-full" style="margin-top:16px" data-send>送出</button>

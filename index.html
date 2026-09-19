@@ -2,9 +2,12 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <!-- interactive-widget=resizes-content：Android Chrome 會在鍵盤彈出時
+       把 layout viewport 一起縮小，固定定位的彈層才不會被壓在鍵盤底下。
+       iOS 不支援這個，那邊靠 ui.js 的 visualViewport 處理。 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="theme-color" content="#FAF6EC">
-  <meta name="description" content="記下每天的善行與功課，湊滿四件就點一盞燈。">
+  <meta name="description" content="隨手記一則善行或觀功念恩，一天點一盞燈。大家的燈飄在同一片夜空。">
   <title>燈燈悅心</title>
 
   <link rel="manifest" href="manifest.webmanifest">
