@@ -1,10 +1,12 @@
 /* 燈燈悅心 — 進入點與分頁切換 */
 
 import { tabIcon, closeSheet } from './ui.js';
+import * as S from './store.js';
 import * as today from './views/today.js';
 import * as sea from './views/sea.js';
 import * as together from './views/together.js';
 import * as meView from './views/me.js';
+import * as welcome from './views/welcome.js';
 
 const TABS = [
   { id: 'today', label: '今日', view: today },
@@ -40,14 +42,37 @@ function paintBar() {
   });
 }
 
+/* 還在取名字的階段，底下那些重畫都要讓開，不然會把首頁蓋掉。 */
+let onboarding = false;
+
 /* 一天過了午夜要重畫，不然日期會停在昨天。 */
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && current === 'today') go('today');
+  if (!document.hidden && !onboarding && current === 'today') go('today');
 });
 
-let start = 'today';
-try { start = localStorage.getItem('dd_tab') || 'today'; } catch { /* 無痕模式 */ }
-go(TABS.some((t) => t.id === start) ? start : 'today');
+/* 第一次打開先問名字。取過名字的人不會再看到這一頁。 */
+function boot() {
+  const first = !S.me().name;
+
+  if (first) {
+    onboarding = true;
+    bar.style.display = 'none';
+    app.style.paddingBottom = '0';
+    welcome.render(app, () => {
+      onboarding = false;
+      bar.style.display = '';
+      app.style.paddingBottom = '';
+      go('today');
+    });
+    return;
+  }
+
+  let start = 'today';
+  try { start = localStorage.getItem('dd_tab') || 'today'; } catch { /* 無痕模式 */ }
+  go(TABS.some((t) => t.id === start) ? start : 'today');
+}
+
+boot();
 
 /* PWA
  * 本機開發時不註冊 service worker——它是 cache-first，
