@@ -56,11 +56,11 @@ export function toast(msg) {
 
 /* ── 底部彈層 ── */
 
-export function sheet(html, onMount) {
+export function sheet(html, onMount, opts = {}) {
   close();
   const bg = document.createElement('div');
   bg.className = 'sheet-bg';
-  bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
+  bg.innerHTML = `<div class="sheet ${opts.className || ''}" role="dialog" aria-modal="true">${html}</div>`;
   bg.addEventListener('click', (e) => { if (e.target === bg) close(); });
   document.body.appendChild(bg);
   onMount?.(bg.querySelector('.sheet'), close);

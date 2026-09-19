@@ -214,7 +214,9 @@ export function statsOf(day) {
  */
 export function addEntry(entry, date = todayStr()) {
   const day = getDay(date);
-  if (day.sealedAt) return { day, ok: false, reason: 'sealed' };
+  // 點過燈也還能寫。「封存」封的是那盞燈的樣子，不是你這一天的紀錄——
+  // 晚上做了好事卻因為中午按過按鈕就寫不進去，沒有道理。
+  // 燈已經鑄好，之後寫的不會改變它。
   if (day.entries.length >= MAX_ENTRIES_PER_DAY) return { day, ok: false, reason: 'full' };
 
   const kind = KINDS[entry.kind] ? entry.kind : 'deed';
@@ -233,7 +235,6 @@ export function addEntry(entry, date = todayStr()) {
 
 export function removeEntry(id, date = todayStr()) {
   const day = getDay(date);
-  if (day.sealedAt) return day;
   day.entries = day.entries.filter((e) => e.id !== id);
   return saveDay(day);
 }

@@ -256,13 +256,31 @@ export function renderLamp(lamp, opts = {}) {
        <path d="M22 13.6c2.1 3.3 3.1 5 3.1 6.6a3.1 3.1 0 0 1-6.2 0c0-1.6 1-3.3 3.1-6.6z" fill="${f.inner}"/>`
     : '';
 
-  return `<svg width="${size}" height="${Math.round(size * 50 / 44)}" viewBox="0 0 44 50" fill="none" style="${vars}" role="img" aria-label="${lamp.name || '燈'}">
+  // xmlns 是必要的：內嵌在 HTML 裡沒差，但把這串 SVG 當成圖片載入
+  // （分享圖卡會這樣做）時，少了它整張圖就不會 render。
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${Math.round(size * 50 / 44)}" viewBox="0 0 44 50" fill="none" style="${vars}" role="img" aria-label="${lamp.name || '燈'}">
     ${art.behind}
     ${flame}
     <path d="M8 31h28c0 7.8-6.3 12.6-14 12.6S8 38.8 8 31z" fill="var(--dark)"/>
     <path d="M8 31h28c0 2.5-.7 4.7-1.9 6.5H9.9C8.7 35.7 8 33.5 8 31z" fill="var(--light)"/>
     ${art.front}
   </svg>`;
+}
+
+/**
+ * 把 CSS 變數換成實際顏色。
+ * 畫到 canvas 的時候需要 —— SVG 被當成圖片載入時沒有外部樣式表，
+ * var(--dark) 這種寫法會變成沒有顏色。
+ */
+export function renderLampFlat(lamp, opts = {}) {
+  const b = BOWLS[lamp.bowl] || BOWLS.cinnabar;
+  const f = FLAMES[lamp.flame] || FLAMES.gamboge;
+  return renderLamp(lamp, opts)
+    .replace(/var\(--dark\)/g, b.dark)
+    .replace(/var\(--light\)/g, b.light)
+    .replace(/var\(--foot\)/g, b.foot)
+    .replace(/var\(--flame-outer\)/g, f.outer)
+    .replace(/var\(--flame-halo\)/g, f.halo);
 }
 
 /**

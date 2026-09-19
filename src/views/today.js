@@ -10,6 +10,7 @@ import * as SB from '../supabase.js';
 import { esc, icon, sheet, closeSheet, toast } from '../ui.js';
 import { renderLamp, depthOf } from '../lamp.js';
 import { showReveal } from './reveal.js';
+import { showMyDay } from './lampcard.js';
 import { DEFAULT_SUTRA, MAX_ENTRIES_PER_DAY, isOnlineMode } from '../config.js';
 
 const KIND_STYLE = {
@@ -38,16 +39,10 @@ export function render(root, go) {
 
     <div class="view">
       ${c.total || c.joys ? entriesCard(day, c) : ''}
-      ${day.sealedAt ? sealedCard(day) : actionsCard(day, c, left)}
+      ${day.sealedAt ? sealedCard(day) : ''}
+      ${actionsCard(day, c, left)}
 
-      <section class="card">
-        <div class="row" style="align-items:baseline;gap:8px">
-          <div class="grow serif" style="font-size:.88rem;font-weight:600">${now.getMonth() + 1} 月</div>
-          <div class="tiny">${monthLit(now)} 天亮著</div>
-        </div>
-        <div class="month-grid" style="margin-top:14px">${monthCells(now)}</div>
-        <div class="small" style="margin-top:13px">中斷不會熄滅，只是那天空著。</div>
-      </section>
+      ${monthCard(now)}
     </div>
   `;
 
@@ -66,6 +61,10 @@ export function render(root, go) {
 
   root.querySelector('[data-show-lamp]')?.addEventListener('click', () => {
     showReveal(S.getDay(date), () => go('today'));
+  });
+
+  root.querySelectorAll('[data-day]').forEach((b) => {
+    b.addEventListener('click', () => showMyDay(b.dataset.day));
   });
 }
 
@@ -139,20 +138,32 @@ function actionsCard(day, c, left) {
     ['note', '其他'],
   ];
 
+  const sealed = Boolean(day.sealedAt);
   const canSeal = S.canSeal(day.date);
   const depth = depthOf(S.statsOf(day));
-  const nudge = left === 0
-    ? '今天的三則寫完了。夠了，剩下的留給明天。'
-    : depth < 0.95
-      ? '再寫一則，比較有機會遇到少見的燈。不寫也沒關係。'
-      : '稀有的機會拉到最高了。';
+
+  // 點過燈之後就沒必要再催了，燈已經鑄好，寫是寫給自己的。
+  const nudge = sealed
+    ? '今天的燈已經點了，之後寫的不會改變它，但還是會記下來。'
+    : left === 0
+      ? '今天的三則寫完了。夠了，剩下的留給明天。'
+      : depth < 0.95
+        ? '再寫一則，比較有機會遇到少見的燈。不寫也沒關係。'
+        : '稀有的機會拉到最高了。';
+
+  if (sealed && left === 0) {
+    return `<div class="small center" style="padding:2px 10px">今天的三則都寫了。</div>`;
+  }
 
   return `
     <section class="card">
       ${canSeal ? `
         <button class="btn btn-full" data-seal>點今天的燈</button>
         <div class="small" style="margin-top:10px">${nudge}</div>
-        <div class="small" style="margin-top:6px;color:var(--faint)">點了就封存，今天不能再改。</div>
+        <div class="small" style="margin-top:6px;color:var(--faint)">點了之後燈就固定了，但還是可以繼續寫。</div>
+      ` : sealed ? `
+        <div class="card-title">還想寫什麼</div>
+        <p class="small" style="margin-top:7px">${nudge}</p>
       ` : `
         <div class="card-title">今天還沒寫</div>
         <p class="small" style="margin-top:7px">
@@ -185,20 +196,53 @@ function sealedCard(day) {
   `;
 }
 
-function monthLit(now) {
-  return S.monthGrid(now.getFullYear(), now.getMonth() + 1).filter((x) => x.lamp).length;
+/**
+ * 真的月曆，不是一排格子。
+ *
+ * 本來是 10 欄的色塊，沒有日期也沒有星期，寫了一則之後
+ * 只有一格亮著，看起來像「亮在最後面」，完全看不出那是幾號。
+ * 現在照星期排，標日期，那一天的燈直接畫在格子裡。
+ */
+function monthCard(now) {
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
+  const cells = S.monthGrid(y, m);
+  const today = S.todayStr();
+  const firstDow = new Date(y, m - 1, 1).getDay();
+  const lit = cells.filter((c) => c.lamp).length;
+
+  return `
+    <section class="card">
+      <div class="row" style="align-items:baseline;gap:8px">
+        <div class="grow serif" style="font-size:.88rem;font-weight:600">${m} 月</div>
+        <div class="tiny">${lit} 天亮著</div>
+      </div>
+
+      <div class="cal" style="margin-top:14px">
+        ${['日', '一', '二', '三', '四', '五', '六'].map((d) => `<div class="cal-dow">${d}</div>`).join('')}
+        ${Array.from({ length: firstDow }, () => '<div></div>').join('')}
+        ${cells.map((c) => calCell(c, today)).join('')}
+      </div>
+
+      <div class="small" style="margin-top:13px">中斷不會熄滅，只是那天空著。</div>
+    </section>
+  `;
 }
 
-function monthCells(now) {
-  const cells = S.monthGrid(now.getFullYear(), now.getMonth() + 1);
-  const today = S.todayStr();
-  const tone = { cinnabar: '#C4553A', azurite: '#43707F', gamboge: '#D9A441', malachite: '#6E8F6B', ochre: '#A9713F' };
-  return cells.map((x) => {
-    if (x.lamp) return `<i style="background:${tone[x.lamp.bowl]}" title="${esc(x.date)}"></i>`;
-    if (x.date > today) return '<i style="background:transparent"></i>';
-    if (x.date === today) return '<i class="blank"></i>';
-    return '<i></i>';
-  }).join('');
+function calCell(c, today) {
+  const d = Number(c.date.slice(8));
+  const isToday = c.date === today;
+
+  if (c.lamp) {
+    return `<button class="cal-day lit${isToday ? ' today' : ''}" data-day="${esc(c.date)}"
+              aria-label="${d} 日 · ${esc(c.lamp.name)}">
+      ${renderLamp(c.lamp, { size: 20 })}
+      <span>${d}</span>
+    </button>`;
+  }
+
+  const cls = isToday ? ' today' : (c.date > today ? ' future' : '');
+  return `<div class="cal-day${cls}"><span>${d}</span></div>`;
 }
 
 /* ── 寫一則 ── */
@@ -219,7 +263,6 @@ const HINT = {
 
 function openWrite(kind, go) {
   const day = S.getDay();
-  if (day.sealedAt) return toast('今天的燈已經點了');
   if (S.entriesLeft(day) === 0) return toast(`一天 ${MAX_ENTRIES_PER_DAY} 則，今天寫完了`);
 
   let current = S.KINDS[kind] ? kind : 'deed';
@@ -274,6 +317,13 @@ function openWrite(kind, go) {
       if (!res.ok) {
         return toast(res.reason === 'full' ? `一天 ${MAX_ENTRIES_PER_DAY} 則，今天寫完了` : '存不進去');
       }
+
+      // 已經發出去的那天又補寫，群裡看到的內容要跟著更新
+      const after = S.getDay();
+      if (after.sealedAt && after.isPublic && isOnlineMode()) {
+        SB.publishLamp(after, S.shareTargets()).catch(() => {});
+      }
+
       closeSheet();
       go('today');
     });

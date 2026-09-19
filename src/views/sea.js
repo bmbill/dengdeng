@@ -9,6 +9,7 @@
 import * as S from '../store.js';
 import * as SB from '../supabase.js';
 import { esc, sheet, closeSheet, toast } from '../ui.js';
+import { showMyDay, showSharedLamp } from './lampcard.js';
 import { renderLamp, renderSpark, glowOf, TIER_LABEL, BOWLS, FLAMES } from '../lamp.js';
 import { SKY_SIZE, SKY_RENDER_CAP, isOnlineMode } from '../config.js';
 
@@ -338,172 +339,14 @@ function hashStr(s) {
 }
 
 /* ══════════════════ 點開一盞燈 ══════════════════ */
+// 小卡的長相統一放在 lampcard.js：重點是善行，不是燈。
 
-/**
- * 自己的燈：內容直接讀本機，不用等網路。
- * 如果這盞有發出去，再去問一下有誰隨喜、有誰說了話。
- */
 function openMine(date) {
-  const day = S.getDay(date);
-  if (!day.lamp) return;
-  const l = day.lamp;
-  const joys = (day.joys || []).length;
-
-  sheet(`
-    ${lampHead(l, S.prettyDate(date))}
-
-    <div class="stack" style="margin-top:20px;gap:12px">
-      ${(day.entries || []).length
-        ? (day.entries || []).map((e) => entryBlock(e)).join('')
-        : '<div class="small">這天沒有寫，只有一盞燈。</div>'}
-      ${joys ? `<div>
-        <div class="tiny">隨喜</div>
-        <div class="small" style="color:var(--ink);margin-top:3px">你隨喜了 ${joys} 盞別人的燈</div>
-      </div>` : ''}
-    </div>
-
-    <div data-echo style="margin-top:16px"></div>
-
-    <button class="btn ghost btn-full" style="margin-top:20px" data-dismiss>關起來</button>
-  `, (el) => {
-    el.querySelector('[data-dismiss]').addEventListener('click', closeSheet);
-    if (day.remoteId) loadEcho(el.querySelector('[data-echo]'), day.remoteId);
-  });
+  showMyDay(date);
 }
 
-/** 自己那盞燈的回音：誰隨喜了、誰說了什麼。 */
-async function loadEcho(slot, remoteId) {
-  const d = await SB.lampDetail(remoteId);
-  if (!d || !slot.isConnected) return;
-  if (!d.joyCount && !d.replies.length) return;
-
-  slot.innerHTML = `
-    <div style="padding-top:15px;border-top:1px solid var(--line)">
-      ${d.joyCount ? `<div class="row" style="gap:10px">
-        <span style="flex-shrink:0">${renderLamp(d.lamp, { size: 28 })}</span>
-        <span class="small" style="color:var(--ink)">${d.joyCount} 個人隨喜了這盞燈</span>
-      </div>` : ''}
-      ${d.replies.length ? `<div class="stack" style="margin-top:12px;gap:8px">
-        ${d.replies.map((r) => `<div class="post-reply"><b>${esc(r.name || '無名')}</b>　${esc(r.body)}</div>`).join('')}
-      </div>` : ''}
-    </div>
-  `;
-}
-
-/** 別人的燈：拉完整內容，可以隨喜、可以說一句。 */
-async function openShared(lampId, root, go) {
-  sheet(`<div class="empty">正在拿這盞燈…</div>`);
-  const d = await SB.lampDetail(lampId);
-  if (!d) {
-    closeSheet();
-    return toast('這盞燈拿不到');
-  }
-
-  const mine = d.authorId === (await SB.myUserId());
-
-  sheet(`
-    ${lampHead(d.lamp, S.prettyDate(d.date))}
-
-    <div class="row" style="margin-top:16px;gap:10px">
-      <span class="avatar" style="width:34px;height:34px;border-radius:17px;font-size:.88rem">${esc(d.authorChar)}</span>
-      <span class="grow" style="font-size:.81rem;font-weight:500">${esc(d.authorName)}${mine ? '（你）' : ''}</span>
-    </div>
-
-    <div class="stack" style="margin-top:14px;gap:12px">
-      ${d.entries.length
-        ? d.entries.map((e) => entryBlock(e)).join('')
-        : '<div class="small">這天沒有公開內容，只有一盞燈。</div>'}
-    </div>
-
-    ${d.replies.length ? `<div class="stack" style="margin-top:16px;gap:8px">
-      ${d.replies.map((r) => `<div class="post-reply"><b>${esc(r.name || '無名')}</b>　${esc(r.body)}</div>`).join('')}
-    </div>` : ''}
-
-    <div class="post-acts" style="margin-top:18px">
-      ${mine ? '' : `
-        <button class="btn chip ${d.joinedByMe ? 'on' : ''}" data-joy data-on="${d.joinedByMe ? '1' : '0'}">
-          <span data-count>隨喜 ${d.joyCount}</span>
-        </button>
-        <button class="btn chip" data-reply>說一句</button>`}
-      ${mine && d.joyCount ? `<span class="small">${d.joyCount} 人隨喜了這盞燈</span>` : ''}
-    </div>
-  `, (el) => {
-    el.querySelector('[data-joy]')?.addEventListener('click', (e) => onJoy(e.currentTarget, d, root, go));
-    el.querySelector('[data-reply]')?.addEventListener('click', () => openReply(d, root, go));
-  });
-}
-
-function lampHead(l, dateText) {
-  return `
-    <div class="center">
-      ${renderLamp(l, { size: 110 })}
-      <h2 style="margin-top:6px;font-size:1.3rem;color:var(--cinnabar-d)">${esc(l.name)}</h2>
-      <div class="tags" style="margin-top:10px">
-        <span class="tag rare">${TIER_LABEL[l.tier]}</span>
-        <span class="tag info">${FLAMES[l.flame]?.name} · ${BOWLS[l.bowl]?.name}</span>
-      </div>
-      <div class="tiny" style="margin-top:12px">${esc(dateText)}</div>
-    </div>
-  `;
-}
-
-function entryBlock(e) {
-  const label = S.KINDS[e.kind]?.name || '紀錄';
-  return `
-    <div>
-      <div class="tiny">${esc(label)}${e.pages ? ` · ${e.pages} 頁` : ''}</div>
-      <div class="small" style="color:var(--ink);margin-top:3px">${esc(e.text)}</div>
-    </div>
-  `;
-}
-
-async function onJoy(btn, d, root, go) {
-  const on = btn.dataset.on === '1';
-  btn.disabled = true;
-  try {
-    const now = await SB.toggleJoy(d.id, !on);
-    btn.dataset.on = now ? '1' : '0';
-    btn.classList.toggle('on', now);
-    const label = btn.querySelector('[data-count]');
-    const n = Number(label.textContent.replace(/\D/g, '')) + (now ? 1 : -1);
-    label.textContent = `隨喜 ${Math.max(0, n)}`;
-
-    // 隨喜不佔你今天那 3 則的額度 —— 那 3 則是你寫下來的，這是你給出去的。
-    if (now) {
-      S.addJoy(d.id, { authorName: d.authorName, date: d.date });
-      // 今天的燈還沒點就還來得及讓它亮一點；點過了就只是記下來。
-      toast(S.getDay().sealedAt ? '隨喜了' : '隨喜了，你今天的燈也亮一點');
-    } else {
-      S.removeJoy(d.id);
-    }
-  } catch (e) {
-    toast(e.message || '隨喜失敗');
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-function openReply(d, root, go) {
-  sheet(`
-    <h2>說一句</h2>
-    <p class="small" style="margin-top:6px">最多 60 字。這裡不是討論區，一句就好。</p>
-    <textarea class="field" rows="3" maxlength="60" style="margin-top:14px" placeholder="例：五頁也是五頁，隨喜。"></textarea>
-    <button class="btn btn-full" style="margin-top:16px" data-send>送出</button>
-  `, (el) => {
-    const ta = el.querySelector('textarea');
-    ta.focus();
-    el.querySelector('[data-send]').addEventListener('click', async () => {
-      const t = ta.value.trim();
-      if (!t) return toast('寫一句再送');
-      try {
-        await SB.reply(d.id, t);
-        closeSheet();
-        toast('送出了');
-      } catch (e) {
-        toast(e.message || '送不出去');
-      }
-    });
-  });
+function openShared(lampId, root, go) {
+  showSharedLamp(lampId);
 }
 
 /* ── 我的全部 ── */

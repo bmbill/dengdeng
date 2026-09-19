@@ -6,7 +6,7 @@
  * 改完程式記得把 VERSION 加一，不然舊快取不會換掉。
  */
 
-const VERSION = 'v8';
+const VERSION = 'v10';
 const CACHE = `dengdeng-${VERSION}`;
 
 const SHELL = [
@@ -29,6 +29,8 @@ const SHELL = [
   './src/views/me.js',
   './src/views/welcome.js',
   './src/invite.js',
+  './src/share.js',
+  './src/views/lampcard.js',
 ];
 
 self.addEventListener('install', (e) => {

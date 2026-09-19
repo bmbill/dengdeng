@@ -3,14 +3,12 @@
 import * as S from '../store.js';
 import { esc, sheet, closeSheet, toast } from '../ui.js';
 import { isOnlineMode } from '../config.js';
-import { unverifiedCount, QUOTES } from '../quotes.js';
 
 export function render(root, go) {
   const me = S.me();
   const t = S.totals();
   const streak = S.currentStreak();
   const longest = S.longestStreak();
-  const unchecked = unverifiedCount();
 
   root.innerHTML = `
     <header class="hd">
@@ -55,16 +53,6 @@ export function render(root, go) {
           <button class="btn ghost grow" data-import>匯入</button>
         </div>
       </section>
-
-      ${unchecked ? `
-      <section class="card card-note">
-        <div style="font-size:.81rem;font-weight:500">引文還有 ${unchecked} 句沒核對</div>
-        <p class="small" style="margin-top:6px">
-          <code style="background:#fff;padding:1px 5px;border-radius:5px">src/quotes.js</code> 裡每一條引文都帶
-          <code style="background:#fff;padding:1px 5px;border-radius:5px">verified: false</code>。
-          逐句對過原典再改成 true，UI 只會顯示核對過的。現在開獎卡只出現燈童自己的話。
-        </p>
-      </section>` : ''}
 
       <div class="small center" style="padding:6px 10px 20px">
         燈燈悅心 · ${t.lamps} 盞燈 · ${t.entries} 則${t.pages ? ` · ${t.pages} 頁經` : ''}
@@ -113,5 +101,3 @@ function doImport(go) {
     });
   });
 }
-
-export { QUOTES };

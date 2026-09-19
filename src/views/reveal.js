@@ -4,6 +4,7 @@ import * as S from '../store.js';
 import { esc, icon, fullscreen, toast } from '../ui.js';
 import { renderLamp, TIER_LABEL, FLAMES, BOWLS } from '../lamp.js';
 import { sayingFor, quoteFor, citationOf } from '../quotes.js';
+import { shareCard } from '../share.js';
 
 /** 燈童：app 自己的角色，不冒名任何人。 */
 function companion(size = 38) {
@@ -84,30 +85,30 @@ export function showReveal(day, onClose) {
 
     <div class="stack" style="gap:10px;padding:26px var(--gutter) 0">
       <button class="btn btn-full" data-close>供到燈海</button>
-      <button class="btn ghost btn-full" data-share>做成卡片，分享給同行</button>
+      <button class="btn ghost btn-full" data-share>做成圖卡分享</button>
     </div>
   `, (el, close) => {
     el.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => {
       close();
       onClose?.();
     }));
-    el.querySelector('[data-share]').addEventListener('click', () => shareCard(day, lamp));
+    el.querySelector('[data-share]').addEventListener('click', (e) => doShare(day, e.currentTarget));
   });
 }
 
-/** 分享：先走系統分享，沒有就複製文字。做圖卡是之後的事。 */
-async function shareCard(day, lamp) {
-  const c = S.countsOf(day);
-  const text = `${S.prettyDate(day.date)}\n今天點了一盞「${lamp.name}」（${TIER_LABEL[lamp.tier]}）\n寫了 ${c.total} 則${c.pages ? ` · 誦經 ${c.pages} 頁` : ''}`;
+/** 分享：畫成一張圖，善行是主角。 */
+async function doShare(day, btn) {
+  const was = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '正在畫…';
   try {
-    if (navigator.share) {
-      await navigator.share({ title: '燈燈悅心', text });
-      return;
-    }
-    await navigator.clipboard.writeText(text);
-    toast('已複製，可以貼給朋友');
-  } catch {
-    toast('這個裝置不支援分享');
+    const r = await shareCard(day);
+    if (r === 'saved') toast('圖卡存好了，可以傳給朋友');
+  } catch (e) {
+    console.warn('[燈燈] 圖卡失敗', e);
+    toast('圖卡做不出來，換個瀏覽器試試');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = was;
   }
 }
-

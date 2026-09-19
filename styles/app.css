@@ -158,14 +158,42 @@ a:hover { color: #8E3A26; }
 .field:focus { border-color: var(--cinnabar); background: #fff; }
 .field::placeholder { color: var(--faint); }
 
-/* ── 月曆小燈 ── */
-.month-grid {
+/* ── 月曆 ── */
+.cal {
   display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
 }
-.month-grid i { height: 16px; border-radius: 8px; background: var(--line); }
-.month-grid i.blank { background: transparent; border: 1.5px dashed #DCCFB4; }
+.cal-dow {
+  text-align: center;
+  font-size: .62rem;
+  color: var(--faint);
+  padding-bottom: 4px;
+  letter-spacing: .04em;
+}
+.cal-day {
+  aspect-ratio: 1;
+  border: none;
+  background: none;
+  padding: 0;
+  border-radius: 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+.cal-day > span {
+  font-size: .6rem;
+  line-height: 1;
+  color: var(--faint);
+}
+.cal-day.lit { cursor: pointer; }
+.cal-day.lit > span { color: var(--muted); }
+.cal-day.lit:active { background: var(--paper-2); }
+.cal-day.today { background: var(--cinnabar-bg); }
+.cal-day.today > span { color: var(--cinnabar-d); font-weight: 700; }
+.cal-day.future > span { color: #E2D9C6; }
 
 /* ── 燈海 ── */
 .sea {
@@ -271,6 +299,39 @@ button.sea-lamp.joined::after {
 .tag { font-size: .69rem; border-radius: 11px; padding: 5px 11px; }
 .tag.rare { color: var(--gamboge-d); background: var(--gamboge-bg); }
 .tag.info { color: var(--azurite-d); background: var(--azurite-bg); }
+
+/* ── 一盞燈的小卡 ──
+   重點是善行，燈只是註腳，所以留白收緊、字級拉近內文。 */
+.sheet.compact { padding: 18px var(--gutter) calc(18px + env(safe-area-inset-bottom, 10px)); }
+
+.card-x {
+  width: 34px; height: 34px; min-height: 34px;
+  flex-shrink: 0; border: none; background: none; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 17px;
+}
+.card-x:active { background: var(--paper-2); }
+
+.entry-kind { font-size: .68rem; color: var(--muted); letter-spacing: .04em; }
+.entry-text {
+  margin-top: 4px;
+  font-size: .94rem;
+  line-height: 1.85;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
+.echo {
+  margin-top: 14px; padding-top: 13px;
+  border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.card-foot {
+  margin-top: 16px; padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: flex; align-items: center; gap: 8px;
+}
 
 /* ── 語錄卡 ── */
 .quote { font-family: var(--serif); font-size: 1.12rem; font-weight: 600; line-height: 1.9; letter-spacing: .05em; }

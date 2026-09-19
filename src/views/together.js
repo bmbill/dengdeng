@@ -11,7 +11,8 @@ import * as SB from '../supabase.js';
 import { esc, icon, sheet, closeSheet, toast } from '../ui.js';
 import { renderLamp } from '../lamp.js';
 import { inviteMessage, inviteUrl, copyText, shareOrCopy } from '../invite.js';
-import { MONTHLY_GOAL, isOnlineMode } from '../config.js';
+import { showSharedLamp } from './lampcard.js';
+import { SKY_SIZE, isOnlineMode } from '../config.js';
 
 let activeGroupId = null;
 
@@ -50,78 +51,93 @@ async function load(root, go) {
   const body = root.querySelector('[data-body]');
   const sub = root.querySelector('[data-sub]');
 
-  // 每次進來都重抓群組清單，別人改了名字或有人加入才看得到。
-  const groups = await SB.myGroups();
-  if (groups === null) {
-    sub.textContent = '目前離線';
-    body.innerHTML = `<div class="empty">連不上伺服器。<br>你自己的紀錄還是好好存在這台裝置上。</div>`;
-    return;
+  // 整段包起來：任何一個呼叫擲錯都不該讓畫面永遠卡在「載入中」。
+  try {
+    // 每次進來都重抓群組清單，別人改了名字或有人加入才看得到。
+    const groups = await SB.myGroups();
+    if (groups === null) {
+      sub.textContent = '目前離線';
+      body.innerHTML = `<div class="empty">連不上伺服器。<br>你自己的紀錄還是好好存在這台裝置上。</div>`;
+      return;
+    }
+
+    if (!groups.length) {
+      sub.textContent = '還沒加入任何群';
+      body.innerHTML = noGroupNotice();
+      body.querySelector('[data-join]').addEventListener('click', () => openAddGroup(root, go));
+      return;
+    }
+
+    if (!groups.some((g) => g.id === activeGroupId)) activeGroupId = groups[0].id;
+    const group = groups.find((g) => g.id === activeGroupId);
+    sub.textContent = `${groups.length} 個群 · ${group.memberCount} 人`;
+
+    // 跟「燈海 → 大家的」同一份資料，只是這裡用讀的。
+    const [feed, info] = await Promise.all([
+      SB.groupSky(activeGroupId, 0, SKY_SIZE),
+      SB.groupSkyInfo(activeGroupId, 0, SKY_SIZE),
+    ]);
+
+    if (feed === null) {
+      body.innerHTML = `<div class="empty">讀不到這個群的燈。<br>資料庫可能還沒更新到最新版的 schema。</div>`;
+      return;
+    }
+
+    body.innerHTML = `
+      ${groups.length > 1 ? `
+        <select class="field" data-group style="padding:11px 13px;font-size:.84rem">
+          ${groups.map((g) => `<option value="${esc(g.id)}" ${g.id === activeGroupId ? 'selected' : ''}>${esc(g.name)} · ${g.memberCount} 人</option>`).join('')}
+        </select>` : ''}
+
+      ${info ? progressCard(info) : ''}
+
+      ${feed.length
+        ? feed.map(lampRow).join('')
+        : `<div class="empty">這片天空還沒有人公開紀錄。<br>你可以是第一個。</div>`}
+
+      <div class="small center" style="padding:2px 10px 0">
+        你的紀錄預設只有自己看得到 · 隨喜別人，你的燈也會亮一點
+      </div>
+
+      <div class="stack" style="gap:10px;padding-top:6px">
+        <button class="btn ghost btn-full" data-invite>邀請朋友加入「${esc(group.name)}」</button>
+      </div>
+    `;
+
+    body.querySelector('[data-group]')?.addEventListener('change', (e) => {
+      activeGroupId = e.target.value;
+      render(root, go);
+    });
+
+    body.querySelector('[data-invite]').addEventListener('click', () => showCode(group));
+
+    body.querySelectorAll('[data-lamp]').forEach((b) => {
+      b.addEventListener('click', () => openLamp(b.dataset.lamp, root, go));
+    });
+  } catch (e) {
+    console.warn('[燈燈] 同行載入失敗', e);
+    sub.textContent = '載入失敗';
+    body.innerHTML = `<div class="empty">載入失敗了。<br>下拉重新整理，或稍後再試。</div>`;
   }
-
-  if (!groups.length) {
-    sub.textContent = '還沒加入任何群';
-    body.innerHTML = noGroupNotice();
-    body.querySelector('[data-join]').addEventListener('click', () => openAddGroup(root, go));
-    return;
-  }
-
-  if (!groups.some((g) => g.id === activeGroupId)) activeGroupId = groups[0].id;
-  const group = groups.find((g) => g.id === activeGroupId);
-  sub.textContent = `${groups.length} 個群 · 共 ${groups.reduce((a, g) => a + Number(g.memberCount), 0)} 人次`;
-
-  const today = S.todayStr();
-  const [feed, totals] = await Promise.all([
-    SB.groupSea(activeGroupId, S.shiftDate(today, -13), today, 40),
-    SB.monthlyTotals(activeGroupId),
-  ]);
-
-  body.innerHTML = `
-    ${groups.length > 1 ? `
-      <select class="field" data-group style="padding:11px 13px;font-size:.84rem">
-        ${groups.map((g) => `<option value="${esc(g.id)}" ${g.id === activeGroupId ? 'selected' : ''}>${esc(g.name)} · ${g.memberCount} 人</option>`).join('')}
-      </select>` : ''}
-
-    ${totals ? progressCard(totals) : ''}
-
-    ${feed && feed.length
-      ? feed.map(lampRow).join('')
-      : `<div class="empty">這兩週還沒有人公開紀錄。<br>你可以是第一個。</div>`}
-
-    <div class="small center" style="padding:2px 10px 0">
-      你的紀錄預設只有自己看得到 · 隨喜別人，你的燈也會亮一點
-    </div>
-
-    <div class="stack" style="gap:10px;padding-top:6px">
-      <button class="btn ghost btn-full" data-invite>看「${esc(group.name)}」的邀請碼</button>
-    </div>
-  `;
-
-  body.querySelector('[data-group]')?.addEventListener('change', (e) => {
-    activeGroupId = e.target.value;
-    render(root, go);
-  });
-
-  body.querySelector('[data-invite]').addEventListener('click', () => showCode(group));
-
-  body.querySelectorAll('[data-lamp]').forEach((b) => {
-    b.addEventListener('click', () => openLamp(b.dataset.lamp, root, go));
-  });
 }
 
 /* ── 片段 ── */
 
-function progressCard(t) {
-  const pct = Math.min(100, Math.round((t.pages / MONTHLY_GOAL) * 100));
+function progressCard(info) {
+  const left = Math.max(0, info.size - info.filled);
+  const pct = Math.round((info.filled / info.size) * 100);
   return `
     <section class="card tight" style="background:var(--night-2)">
       <div class="row" style="align-items:baseline;gap:8px">
-        <div class="grow" style="font-size:.81rem;font-weight:500;color:var(--night-ink)">本月大眾共修</div>
-        <div class="serif" style="font-size:1.12rem;font-weight:700;color:#F2C877">${t.pages}</div>
-        <div style="font-size:.72rem;color:var(--night-muted)">/ ${MONTHLY_GOAL} 頁</div>
+        <div class="grow" style="font-size:.81rem;font-weight:500;color:var(--night-ink)">第 ${info.skyNo} 片天空</div>
+        <div class="serif" style="font-size:1.12rem;font-weight:700;color:#F2C877">${info.filled}</div>
+        <div style="font-size:.72rem;color:var(--night-muted)">/ ${info.size} 盞</div>
       </div>
       <div class="bar on-night" style="margin-top:11px"><i style="width:${pct}%"></i></div>
-      <div style="margin-top:10px;font-size:.72rem;color:var(--night-muted);line-height:1.6">
-        ${t.lamps} 盞燈 · ${t.entries} 則 · ${t.members} 人一起 · 只記總數，不排名次
+      <div style="margin-top:10px;font-size:.72rem;color:var(--night-muted);line-height:1.7">
+        ${left ? `再 ${left} 盞就滿了` : '滿了，下一盞會開新的一片'} ·
+        ${info.authors} 個人 · ${info.entries} 則${info.pages ? ` · ${info.pages} 頁經` : ''}
+        <br>只記總數，不排名次
       </div>
     </section>
   `;
@@ -188,105 +204,10 @@ function noGroupNotice() {
 }
 
 /* ── 一盞燈 ── */
+// 跟燈海點開的是同一張小卡，見 lampcard.js
 
-async function openLamp(lampId, root, go) {
-  sheet(`<div class="empty">正在拿這盞燈…</div>`);
-  const d = await SB.lampDetail(lampId);
-  if (!d) {
-    closeSheet();
-    return toast('這盞燈拿不到');
-  }
-  const myId = await SB.myUserId();
-  const mine = d.authorId === myId;
-
-  sheet(`
-    <div class="center">
-      ${renderLamp(d.lamp, { size: 92 })}
-      <h2 style="margin-top:6px;font-size:1.2rem;color:var(--cinnabar-d)">${esc(d.lamp.name)}</h2>
-      <div class="tiny" style="margin-top:8px">${esc(S.prettyDate(d.date))}</div>
-    </div>
-
-    <div class="row" style="margin-top:16px;gap:10px">
-      <span class="avatar" style="width:34px;height:34px;border-radius:17px;font-size:.88rem">${esc(d.authorChar)}</span>
-      <span class="grow" style="font-size:.81rem;font-weight:500">${esc(d.authorName)}${mine ? '（你）' : ''}</span>
-    </div>
-
-    <div class="stack" style="margin-top:14px;gap:12px">
-      ${d.entries.length
-        ? d.entries.map((e) => `
-          <div>
-            <div class="tiny">${esc(S.KINDS[e.kind]?.name || '紀錄')}${e.pages ? ` · ${e.pages} 頁` : ''}</div>
-            <div class="small" style="color:var(--ink);margin-top:3px">${esc(e.text)}</div>
-          </div>`).join('')
-        : '<div class="small">這天沒有公開內容，只有一盞燈。</div>'}
-    </div>
-
-    ${d.replies.length ? `<div class="stack" style="margin-top:16px;gap:8px">
-      ${d.replies.map((r) => `<div class="post-reply"><b>${esc(r.name || '無名')}</b>　${esc(r.body)}</div>`).join('')}
-    </div>` : ''}
-
-    <div class="post-acts" style="margin-top:18px">
-      ${mine
-        ? (d.joyCount ? `<span class="small">${d.joyCount} 人隨喜了這盞燈</span>` : '')
-        : `<button class="btn chip ${d.joinedByMe ? 'on' : ''}" data-joy data-on="${d.joinedByMe ? '1' : '0'}">
-             <span data-count>隨喜 ${d.joyCount}</span>
-           </button>
-           <button class="btn chip" data-reply>說一句</button>`}
-    </div>
-  `, (el) => {
-    el.querySelector('[data-joy]')?.addEventListener('click', (e) => onJoy(e.currentTarget, d));
-    el.querySelector('[data-reply]')?.addEventListener('click', () => openReply(d, root, go));
-  });
-}
-
-async function onJoy(btn, d) {
-  const on = btn.dataset.on === '1';
-  btn.disabled = true;
-  try {
-    const now = await SB.toggleJoy(d.id, !on);
-    btn.dataset.on = now ? '1' : '0';
-    btn.classList.toggle('on', now);
-    const label = btn.querySelector('[data-count]');
-    const n = Number(label.textContent.replace(/\D/g, '')) + (now ? 1 : -1);
-    label.textContent = `隨喜 ${Math.max(0, n)}`;
-
-    // 隨喜不佔你今天那 3 則的額度。
-    if (now) {
-      S.addJoy(d.id, { authorName: d.authorName, date: d.date });
-      // 今天的燈還沒點就還來得及讓它亮一點；點過了就只是記下來。
-      toast(S.getDay().sealedAt ? '隨喜了' : '隨喜了，你今天的燈也亮一點');
-    } else {
-      S.removeJoy(d.id);
-    }
-  } catch (e) {
-    toast(e.message || '隨喜失敗');
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-function openReply(d, root, go) {
-  sheet(`
-    <h2>說一句</h2>
-    <p class="small" style="margin-top:6px">最多 60 字。這裡不是討論區，一句就好。</p>
-    <textarea class="field" rows="3" maxlength="60" style="margin-top:14px" placeholder="例：五頁也是五頁，隨喜。"></textarea>
-    <button class="btn btn-full" style="margin-top:16px" data-send>送出</button>
-  `, (el) => {
-    const ta = el.querySelector('textarea');
-    ta.focus();
-    el.querySelector('[data-send]').addEventListener('click', async () => {
-      const t = ta.value.trim();
-      if (!t) return toast('寫一句再送');
-      try {
-        await SB.reply(d.id, t);
-        closeSheet();
-        toast('送出了');
-        render(root, go);
-      } catch (e) {
-        toast(e.message || '送不出去');
-      }
-    });
-  });
+function openLamp(lampId, root, go) {
+  showSharedLamp(lampId, () => render(root, go));
 }
 
 /* ── 群組 ── */
