@@ -208,7 +208,9 @@ async function renderGroup(root, go) {
       </div>` : ''}
     </div>
 
-    ${shown ? `<div class="small center">點一盞燈，看看那天發生了什麼</div>` : ''}
+    ${shown ? `<div class="small center">
+      點一盞燈，看看那天發生了什麼${lamps.some((l) => l.joinedByMe) ? '<br>外面有圈的，是你隨喜過的' : ''}
+    </div>` : ''}
     ${isNow ? fillingCard(info) : sealedCard(info)}
   `;
 
@@ -327,9 +329,14 @@ function place(it, x, y, glow = 0) {
   }
 
   // 共同燈海：點了看那天的善行，可以隨喜
-  const label = it.joys ? `看這盞燈，${it.joys} 人隨喜` : '看這盞燈';
+  const label = [
+    '看這盞燈',
+    it.joys ? `${it.joys} 人隨喜` : '',
+    it.joined ? '你隨喜過' : '',
+  ].filter(Boolean).join('，');
+
   return `<button class="sea-lamp${it.joined ? ' joined' : ''}" style="${pos}"
-            data-lamp-id="${esc(it.id)}" aria-label="${label}">${spark}</button>`;
+            data-lamp-id="${esc(it.id)}" title="${label}" aria-label="${label}">${spark}</button>`;
 }
 
 function hashStr(s) {
