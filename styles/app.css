@@ -259,9 +259,9 @@ button.sea-lamp:focus-visible { outline: 2px solid var(--night-ink); outline-off
 }
 @keyframes drift {
   0%, 100% { transform: translate(-50%, -50%); }
-  30% { transform: translate(calc(-50% + var(--w1x, 5px)), calc(-50% + var(--w1y, -3px))); }
-  55% { transform: translate(calc(-50% + var(--w2x, 3px)), calc(-50% + var(--w2y, 4px))); }
-  80% { transform: translate(calc(-50% + var(--w3x, -2px)), calc(-50% + var(--w3y, -2px))); }
+  30% { transform: translate(calc(-50% + var(--w1x, 5px) * var(--wind, 1)), calc(-50% + var(--w1y, -3px) * var(--windm, 1))); }
+  55% { transform: translate(calc(-50% + var(--w2x, 3px) * var(--wind, 1)), calc(-50% + var(--w2y, 4px) * var(--windm, 1))); }
+  80% { transform: translate(calc(-50% + var(--w3x, -2px) * var(--wind, 1)), calc(-50% + var(--w3y, -2px) * var(--windm, 1))); }
 }
 
 /* 地平線在底部那塊漸層的上緣。景物要站在那條線上，

@@ -193,6 +193,8 @@ function renderMine(root, go) {
     ${list.length ? recent(list) : ''}
   `;
 
+  startWind();
+
   body.querySelector('[data-all]')?.addEventListener('click', openAll);
   body.querySelectorAll('[data-mine]').forEach((b) => {
     b.addEventListener('click', () => openMine(b.dataset.mine));
@@ -291,6 +293,8 @@ async function renderGroup(root, go) {
     ${isNow ? fillingCard(info) : sealedCard(info)}
   `;
 
+  startWind();
+
   body.querySelectorAll('[data-lamp-id]').forEach((b) => {
     b.addEventListener('click', () => openShared(b.dataset.lampId, root, go));
   });
@@ -384,7 +388,7 @@ export function scatter(items, opts = {}) {
       // 抖動要夠大。R2 序列本身鋪得很勻，但連續的點會排成格子，
       // 一百多盞的時候會看到斜向的條紋。
       const jx = ((seed % 1000) / 1000 - 0.5) * 11;
-      const jy = (((seed >> 10) % 1000) / 1000 - 0.5) * 10;
+      const jy = (((seed >>> 10) % 1000) / 1000 - 0.5) * 10;
       let x = 8 + 84 * ((0.5 + n * R2_X) % 1) + jx;
       let y = 11 + 64 * ((0.5 + n * R2_Y) % 1) + jy;
       if (opts.avoidMoon) ({ x, y } = clearOfMoon(x, y, seed));
@@ -410,7 +414,7 @@ function clearOfMoon(x, y, seed) {
   if (d >= 1 || d === 0) return { x, y };
 
   // 推到邊上再多推一點點，不然所有被推開的燈會沿著邊排成一圈
-  const push = 1 + ((seed >> 20) % 100) / 220;
+  const push = 1 + ((seed >>> 20) % 100) / 220;
   return {
     x: MOON.x + (dx / d) * MOON.rx * push,
     y: MOON.y + (dy / d) * MOON.ry * push,
@@ -445,6 +449,61 @@ function place(it, x, y, glow = 0, seed = 0) {
             data-lamp-id="${esc(it.id)}" title="${label}" aria-label="${label}">${spark}${mark}</button>`;
 }
 
+/* ── 風向會轉 ──
+ *
+ * 每盞燈的擺動路徑是固定的，但整片天空共用一個「主風向」--wind
+ * （-1 往左、1 往右）和一個「風力」--windm。這兩個值慢慢變，
+ * 所有燈就會一起轉向、一起變強變弱——那才是風，
+ * 不然每盞各擺各的，看起來只是一堆東西在抖。
+ *
+ * 只在畫面上真的有夜空、而且分頁在前景時才跑；
+ * 使用者關掉動態效果就完全不啟動。
+ */
+let windTimer = null;
+
+function stopWind() {
+  clearInterval(windTimer);
+  windTimer = null;
+}
+
+export function startWind() {
+  stopWind();
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  let from = 1;
+  let to = -0.55;
+  let t = 0;
+  let dur = 24;
+
+  windTimer = setInterval(() => {
+    const skies = document.querySelectorAll('.sea.windy');
+    if (!skies.length) return stopWind();   // 離開燈海就別再算了
+    if (document.hidden) return;
+
+    t += 0.25;
+    if (t >= dur) {
+      from = to;
+      // 下一陣風：有時大轉向，有時只是微調，偶爾幾乎停下來
+      const calm = Math.random() < 0.22;
+      to = calm
+        ? (Math.random() * 0.3 - 0.15)
+        : (Math.random() * 2 - 1) * (0.45 + Math.random() * 0.55);
+      t = 0;
+      dur = 16 + Math.random() * 44;        // 16~60 秒轉完一次
+    }
+
+    const k = t / dur;
+    const ease = k < 0.5 ? 2 * k * k : 1 - ((-2 * k + 2) ** 2) / 2;
+    const w = from + (to - from) * ease;
+
+    skies.forEach((el) => {
+      el.style.setProperty('--wind', w.toFixed(3));
+      // 上下的浮動不跟著左右翻面，只跟著風力大小
+      el.style.setProperty('--windm', (0.35 + Math.abs(w) * 0.65).toFixed(3));
+    });
+  }, 250);
+}
+
 /**
  * 每一盞燈自己的風。
  *
@@ -454,11 +513,15 @@ function place(it, x, y, glow = 0, seed = 0) {
  */
 function windVars(seed) {
   const h = seed >>> 0;
-  const amp = 3 + (h % 9);                       // 幅度 3~11px
-  const sway = 0.45 + ((h >> 4) % 6) / 10;       // 上下相對幅度
-  const dur = 8 + ((h >> 8) % 11);               // 8~18 秒，快慢差很多才像陣風
-  const delay = -((h >> 13) % 17);               // 錯開起點，不然會一起擺
-  const back = 0.25 + ((h >> 17) % 4) / 10;      // 回擺的深淺
+  // 一律用無號位移 >>>。JS 的 >> 是有號的：h 雖然是正的，
+  // h >> 8 會先當成有號 32 位元，最高位是 1 就變負數，
+  // 而負數取餘數在 JS 裡結果也是負的 —— 於是會算出
+  // 負的動畫時間（直接失效）、正的 delay、方向相反的位移。
+  const amp = 3 + (h % 9);                        // 幅度 3~11px
+  const sway = 0.45 + ((h >>> 4) % 6) / 10;       // 上下相對幅度
+  const dur = 8 + ((h >>> 8) % 11);               // 8~18 秒，快慢差很多才像陣風
+  const delay = -((h >>> 13) % 17);               // 錯開起點，不然會一起擺
+  const back = 0.25 + ((h >>> 17) % 4) / 10;      // 回擺的深淺
 
   // 主風向往右：三個時間點都偏正，只是多寡不同
   return [

@@ -32,7 +32,7 @@
 
 <script type="module">
 import { makeLamp } from './src/lamp.js';
-import { scenery, stageClasses, scatter } from './src/views/sea.js';
+import { scenery, stageClasses, scatter, startWind } from './src/views/sea.js';
 
 const STAGES = [
   { n: 7,   what: '起風，燈開始飄' },
@@ -85,6 +85,9 @@ document.getElementById('stages').innerHTML = STAGES.map(({ n, what }) => {
     </section>
   `;
 }).join('');
+
+// 風向會轉，所有天空一起轉
+startWind();
 </script>
 </body>
 </html>
