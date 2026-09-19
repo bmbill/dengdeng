@@ -60,12 +60,18 @@ function starField() {
 }
 
 function reeds() {
+  // 等距等高會看起來像柵欄。用無理數步長鋪開，高矮和傾斜都錯開。
   return `<svg class="sky-reeds" viewBox="0 0 320 40" preserveAspectRatio="none" fill="none" aria-hidden="true">
-    ${[...Array(22)].map((_, i) => {
-      const x = 6 + i * 14.6;
-      const h = 14 + ((i * 7) % 18);
-      const lean = ((i % 3) - 1) * 5;
-      return `<path d="M${x} 40C${x + lean} ${40 - h * 0.6} ${x + lean} ${40 - h * 0.85} ${x + lean * 1.6} ${40 - h}"/>`;
+    ${[...Array(64)].map((_, i) => {
+      // 均勻鋪底再加位移：純無理數步長會結成幾叢，中間留空檔
+      const x = (i * 5) + 10 * (((i + 1) * 0.7548776662) % 1);
+      const h = 8 + ((i * 13) % 20);
+      const lean = (((i * 7) % 11) - 5) * 1.2;
+      const op = (0.45 + ((i * 5) % 6) * 0.09).toFixed(2);
+      const p1 = `${(x + lean * 0.35).toFixed(1)} ${(40 - h * 0.45).toFixed(1)}`;
+      const p2 = `${(x + lean * 0.8).toFixed(1)} ${(40 - h * 0.82).toFixed(1)}`;
+      const p3 = `${(x + lean).toFixed(1)} ${(40 - h).toFixed(1)}`;
+      return `<path d="M${x.toFixed(1)} 40C${p1} ${p2} ${p3}" opacity="${op}"/>`;
     }).join('')}
   </svg>`;
 }
@@ -354,8 +360,10 @@ function scatter(items) {
       const seed = hashStr(it.key);
       const n = i + 1;
       // 小幅抖動，把序列殘留的規律再打散一點
-      const jx = ((seed % 1000) / 1000 - 0.5) * 5;
-      const jy = (((seed >> 10) % 1000) / 1000 - 0.5) * 5;
+      // 抖動要夠大。R2 序列本身鋪得很勻，但連續的點會排成格子，
+      // 一百多盞的時候會看到斜向的條紋。
+      const jx = ((seed % 1000) / 1000 - 0.5) * 11;
+      const jy = (((seed >> 10) % 1000) / 1000 - 0.5) * 10;
       const x = 8 + 84 * ((0.5 + n * R2_X) % 1) + jx;
       const y = 11 + 64 * ((0.5 + n * R2_Y) % 1) + jy;
       return { it, x, y, glow: glowOf(it.joys) };

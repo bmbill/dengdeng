@@ -143,14 +143,20 @@ export function bowlFor(day) {
 }
 
 /**
- * 焰色。連續天數優先，其次是當天的樣子。
- * 連得越久焰色越少見——這是唯一跟「持續」有關的獎賞，
- * 而且斷了也只是回到藤黃焰，不會失去已經供出去的燈。
+ * 焰色。
+ *
+ * 連續天數只在「剛好走到倍數」那一天變色——不是「連滿 49 天之後
+ * 每一盞都是紫焰」。後者會讓夜空在最該豐富的時候變成單色，
+ * 而且那個顏色也不再代表什麼，因為它天天都在。
+ *
+ * 現在白焰大約每 7 天一次、青焰每 21 天、紫焰每 49 天，
+ * 是那一天的標記，不是之後的狀態。
  */
 export function flameFor(day, streak) {
-  if (streak >= 49) return 'violet';
-  if (streak >= 21) return 'azure';
-  if (streak >= 7) return 'white';
+  const n = streak || 0;
+  if (n > 0 && n % 49 === 0) return 'violet';
+  if (n > 0 && n % 21 === 0) return 'azure';
+  if (n > 0 && n % 7 === 0) return 'white';
   if ((day.joys || 0) >= 3) return 'malachite';
   if ((day.total || 0) >= 3 || (day.pages || 0) >= 10) return 'cinnabar';
   return 'gamboge';
