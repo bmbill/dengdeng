@@ -5,6 +5,10 @@
  *   焰　色 ← 當天的份量與連續天數（你的努力）
  *   形　制 ← 加權隨機抽（驚喜），份量越足，抽到稀有形制的機率越高
  *
+ * 寫下第一則的當下燈就亮了（第一抽）。之後每補寫一則多一次抽，
+ * 用 ctx.draw 帶進來換 seed —— 同一個 draw 永遠抽出同一盞，
+ * 所以重新整理不會換獎，但按「再抽一次」會。
+ *
  * 所有燈都由同一支 renderLamp() 畫出來，不需要美術素材。
  */
 
@@ -81,6 +85,9 @@ export const FORMS = {
 };
 
 export const TIER_LABEL = { common: '常見', uncommon: '少見', rare: '難得' };
+
+/** 難得程度的高低。重抽只往上：抽到比現在這盞難得才換。 */
+export const TIER_RANK = { common: 0, uncommon: 1, rare: 2 };
 
 /* ── 燈身紋樣 ──
  *
@@ -221,12 +228,13 @@ function pickForm(seed, depth) {
 /**
  * 依當天的紀錄產生一盞燈。
  * @param {{date:string, deeds:number, pages:number, joys:number, notes:number}} day
- * @param {{streak:number, isFirstEver:boolean, seedSalt:string}} ctx
+ * @param {{streak:number, isFirstEver:boolean, seedSalt:string, draw:number}} ctx
+ *   draw —— 今天的第幾抽。1 不加進 seed，舊的燈才不會因為改版換形制。
  */
 export function makeLamp(day, ctx = {}) {
-  const { streak = 0, isFirstEver = false, seedSalt = '' } = ctx;
+  const { streak = 0, isFirstEver = false, seedSalt = '', draw = 1 } = ctx;
   const depth = depthOf(day);
-  const form = pickForm(`${day.date}|${seedSalt}`, depth);
+  const form = pickForm(`${day.date}|${seedSalt}${draw > 1 ? `|${draw}` : ''}`, depth);
   const bowl = bowlFor(day);
   const flame = flameFor(day, streak);
 

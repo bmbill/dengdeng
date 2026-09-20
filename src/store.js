@@ -5,7 +5,7 @@
  */
 
 import { DEFAULT_SUTRA, MAX_ENTRIES_PER_DAY } from './config.js';
-import { makeLamp } from './lamp.js';
+import { makeLamp, TIER_RANK } from './lamp.js';
 
 const KEY_DAYS = 'dd_days';
 const KEY_ME = 'dd_me';
@@ -123,7 +123,7 @@ export function setShareTargets(ids) {
  * 一天就是一串「則」。
  *
  * 刻意不做成「四格都要填滿才算數」——那比隨手寫一句難太多，
- * 是會把人累垮的那種設計。一則短短的就能供燈；多寫只是讓你
+ * 是會把人累垮的那種設計。一則短短的燈就亮了；多寫只是讓你
  * 比較可能遇到少見的燈，不是門檻。
  *
  * entry = { id, kind, text, pages?, postId?, at }
@@ -145,6 +145,8 @@ export function emptyDay(date) {
     lamp: null,
     sealedAt: null,
     isPublic: false,
+    draws: 0,             // 今天抽過幾次。一則一抽，只往上換
+    askedShare: false,    // 今天問過「要發到哪幾個群」了沒
   };
 }
 
@@ -216,9 +218,6 @@ export function statsOf(day) {
  */
 export function addEntry(entry, date = todayStr()) {
   const day = getDay(date);
-  // 供過燈也還能寫。「封存」封的是那盞燈的樣子，不是你這一天的紀錄——
-  // 晚上做了好事卻因為中午按過按鈕就寫不進去，沒有道理。
-  // 燈已經鑄好，之後寫的不會改變它。
   if (day.entries.length >= MAX_ENTRIES_PER_DAY) return { day, ok: false, reason: 'full' };
 
   const kind = KINDS[entry.kind] ? entry.kind : 'deed';
@@ -232,12 +231,31 @@ export function addEntry(entry, date = todayStr()) {
     ...(entry.pages ? { pages: Math.max(0, Math.round(entry.pages)) } : {}),
     at: new Date().toISOString(),
   });
-  return { day: saveDay(day), ok: true };
+  saveDay(day);
+
+  // 寫下去就供燈。第一則把燈供上去，之後每一則讓它跟著今天的紀錄長
+  // （顏色與焰色會變，形制要自己按「再抽一次」）。
+  return { day: day.sealedAt ? refreshLamp(date) : seal(date), ok: true };
 }
 
+/**
+ * 移掉一則。
+ *
+ * 燈已經亮著也照移——打錯字不該變成今天的紀錄。
+ * 移到一則不剩、也沒隨喜過，那今天本來就沒發生什麼，燈跟著收掉。
+ */
 export function removeEntry(id, date = todayStr()) {
   const day = getDay(date);
   day.entries = day.entries.filter((e) => e.id !== id);
+  saveDay(day);
+
+  if (!day.sealedAt) return day;
+  if (day.entries.length || day.joys.length) return refreshLamp(date);
+
+  day.lamp = null;
+  day.sealedAt = null;
+  day.draws = 0;
+  day.isPublic = false;
   return saveDay(day);
 }
 
@@ -252,12 +270,25 @@ export function addJoy(lampId, meta = {}, date = todayStr()) {
   // 但「我今天隨喜了誰」是發生過的事，沒有理由不留下來。
   if (day.joys.some((j) => j.lampId === lampId)) return day;
   day.joys.push({ lampId, ...meta, at: new Date().toISOString() });
-  return saveDay(day);
+  saveDay(day);
+
+  // 一整天只隨喜、沒寫東西，燈一樣亮——只是不會自己跑去群裡，
+  // 要等你寫第一則的時候才問要不要發。
+  return day.sealedAt ? refreshLamp(date) : seal(date);
 }
 
 export function removeJoy(lampId, date = todayStr()) {
   const day = getDay(date);
   day.joys = day.joys.filter((j) => j.lampId !== lampId);
+  saveDay(day);
+
+  if (!day.sealedAt) return day;
+  if (day.entries.length || day.joys.length) return refreshLamp(date);
+
+  // 今天只有那一下隨喜，收回來就等於今天還沒開始
+  day.lamp = null;
+  day.sealedAt = null;
+  day.draws = 0;
   return saveDay(day);
 }
 
@@ -274,6 +305,7 @@ export function setSutraName(name, date = todayStr()) {
 export function setPublic(isPublic, date = todayStr()) {
   const day = getDay(date);
   day.isPublic = Boolean(isPublic);
+  day.askedShare = true;
   return saveDay(day);
 }
 
@@ -288,36 +320,96 @@ export function setRemoteId(id, date = todayStr()) {
   return saveDay(day);
 }
 
-/* ── 封印一天，供燈 ── */
+/* ── 供燈 ──
+ *
+ * 沒有「供燈」按鈕了。寫下第一則的當下燈就亮，寫一句就看得到結果。
+ *
+ * 本來是寫完自己按一下才開獎，結果變成：想多寫幾則再按比較划算，
+ * 於是一直不按，然後忘記，隔天被系統補供——最該屬於你的那一下
+ * 反而是系統按的。現在倒過來：第一則就供上去，之後每補一則多一次
+ * 重抽的機會，而且只往上，所以晚點寫不會讓人覺得虧。
+ */
 
-/** 一則就夠，或者只是隨喜了別人也算。門檻刻意壓到最低。 */
-export function canSeal(date = todayStr()) {
-  const day = getDay(date);
-  return !day.sealedAt && (day.entries.length >= 1 || day.joys.length >= 1);
+/** 今天可以抽幾次：寫幾則就幾次。只隨喜沒寫的日子也有一次。 */
+export function drawsAllowed(day) {
+  return Math.max(1, Math.min(MAX_ENTRIES_PER_DAY, day.entries.length));
+}
+
+export function drawsLeft(day) {
+  if (!day.lamp) return 0;
+  return Math.max(0, drawsAllowed(day) - (day.draws || 1));
+}
+
+/** 第 n 抽的燈長什麼樣。同一個 n 永遠一樣，所以重新整理不會換獎。 */
+function buildLamp(day, draw) {
+  return makeLamp(statsOf(day), {
+    streak: streakEndingAt(shiftDate(day.date, -1)) + 1,
+    // 舊資料沒存這個旗標，用名字認出來
+    isFirstEver: day.isFirst ?? (day.lamp?.name === '初發心燈'),
+    seedSalt: me().id,
+    draw,
+  });
 }
 
 export function seal(date = todayStr()) {
   const day = getDay(date);
   if (day.sealedAt || (day.entries.length < 1 && day.joys.length < 1)) return day;
 
-  day.lamp = makeLamp(statsOf(day), {
-    streak: streakEndingAt(shiftDate(date, -1)) + 1,
-    isFirstEver: lamps().length === 0,
-    seedSalt: me().id,
-  });
+  day.isFirst = lamps().length === 0;
+  day.draws = 1;
+  day.lamp = buildLamp(day, 1);
   day.sealedAt = new Date().toISOString();
   return saveDay(day);
 }
 
 /**
- * 補供過去忘了按的燈。
+ * 讓燈跟上今天的紀錄。
  *
- * 忘記按不該讓那一天整個消失。這個 app 每一處都不懲罰中斷——
- * 連續天數不歸零、斷了只是那天空著——唯獨這裡會因為你沒按到
- * 就整天沒燈，前後矛盾。
+ * 顏色與焰色本來就不是抽的——是「今天寫了什麼、寫了多少」算出來的，
+ * 所以補寫一則之後它們該跟著變。形制是運氣，不在這裡動：
+ * 那要自己按「再抽一次」。
+ */
+export function refreshLamp(date = todayStr()) {
+  const day = getDay(date);
+  if (!day.lamp || date !== todayStr()) return day;
+
+  const next = buildLamp(day, day.draws || 1);
+  day.lamp = { ...next, form: day.lamp.form, tier: day.lamp.tier, name: day.lamp.name };
+  return saveDay(day);
+}
+
+/**
+ * 再抽一次。
  *
- * 只補「過去」的。今天的留給你自己按，那一下是開獎，
- * 不該被系統搶走。
+ * 只往上：抽到比現在這盞難得才換，不然留著原本那盞。
+ * 補寫一則是「多一次機會」，不是「拿已經到手的燈去賭」——
+ * 不然就會有人為了不弄丟難得的燈而不敢再寫。
+ *
+ * @returns {{drawn, before, kept, lamp, left}|null}
+ */
+export function redraw(date = todayStr()) {
+  const day = getDay(date);
+  if (!day.lamp || date !== todayStr() || drawsLeft(day) <= 0) return null;
+
+  const before = day.lamp;
+  day.draws = (day.draws || 1) + 1;
+
+  const drawn = buildLamp(day, day.draws);
+  const kept = TIER_RANK[drawn.tier] > TIER_RANK[before.tier];
+  // 沒換形制也要收下新的顏色：那是今天多寫的那一則算出來的。
+  day.lamp = kept ? drawn : { ...drawn, form: before.form, tier: before.tier, name: before.name };
+  saveDay(day);
+
+  return { drawn, before, kept, lamp: day.lamp, left: drawsLeft(day) };
+}
+
+/**
+ * 補上沒亮起來的燈。
+ *
+ * 改成「寫下去就供燈」之後，這裡多半沒事做了——留著是因為
+ * 舊版本存下來的日子還沒有燈，以及偶爾寫得進 localStorage、
+ * 燈卻沒存成功的意外。只補「過去」的：今天的不補，
+ * 今天要嘛已經亮了，要嘛你還沒寫。
  *
  * @returns 補了哪幾天
  */

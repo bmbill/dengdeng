@@ -234,6 +234,8 @@ async function onJoy(btn, l) {
   if (!l) return;
   const on = btn.dataset.on === '1';
   btn.disabled = true;
+  // 一整天只隨喜、沒寫東西，這一下也會供上今天的燈
+  const wasLit = Boolean(S.getDay().lamp);
   try {
     const now = await SB.toggleJoy(l.id, !on);
     btn.dataset.on = now ? '1' : '0';
@@ -245,7 +247,7 @@ async function onJoy(btn, l) {
     // 隨喜不佔你今天那 3 則 —— 那 3 則是你寫下來的，這是你給出去的。
     if (now) {
       S.addJoy(l.id, { authorName: l.authorName, date: l.date });
-      toast(S.getDay().sealedAt ? '隨喜了' : '隨喜了，你今天的燈也亮一點');
+      toast(wasLit ? '隨喜了' : '隨喜了 · 今天的燈也亮了');
     } else {
       S.removeJoy(l.id);
     }

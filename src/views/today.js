@@ -1,14 +1,17 @@
 /* 今日 —— 隨手寫一則
  *
- * 門檻刻意壓到最低：一則短短的就能供燈（只是隨喜了別人也算）。
+ * 門檻刻意壓到最低：一則短短的燈就亮了（只是隨喜了別人也算）。
  * 上限 3 則。不是限制你，是為了讓「一則」還是一件事——
  * 可以無限寫的話，寫下來這個動作就不值錢了。
+ *
+ * 沒有「供燈」按鈕：寫下去燈就亮了，寫一句馬上看得到結果。
+ * 之後補寫一則就多一次「再抽一次」的機會，而且只往上換。
  */
 
 import * as S from '../store.js';
 import * as SB from '../supabase.js';
 import { esc, icon, sheet, closeSheet, toast } from '../ui.js';
-import { renderLamp, depthOf } from '../lamp.js';
+import { renderLamp } from '../lamp.js';
 import { showReveal } from './reveal.js';
 import { showMyDay } from './lampcard.js';
 import { DEFAULT_SUTRA, MAX_ENTRIES_PER_DAY, isOnlineMode } from '../config.js';
@@ -52,12 +55,22 @@ export function render(root, go) {
 
   root.querySelectorAll('[data-del]').forEach((b) => {
     b.addEventListener('click', () => {
-      S.removeEntry(b.dataset.del);
+      // 移掉最後一則會讓燈跟著收掉，群裡那盞也要跟著收回。
+      const before = S.getDay();
+      const after = S.removeEntry(b.dataset.del);
+      if (before.isPublic && isOnlineMode()) {
+        (after.lamp
+          ? SB.publishLamp(after, S.shareTargets())
+          // 燈收掉了，群裡那盞也要收回。帶 before 的燈只是為了讓 RPC 認得這一天，
+          // 送出去的內容是 after —— 不然剛移掉的那則會再被寫回去一次。
+          : SB.unpublishLamp({ ...after, lamp: before.lamp })).catch(() => {});
+      }
       go('today');
     });
   });
 
-  root.querySelector('[data-seal]')?.addEventListener('click', () => openSeal(go));
+  root.querySelector('[data-redraw]')?.addEventListener('click', () => doRedraw(go));
+  root.querySelector('[data-share-to]')?.addEventListener('click', () => openShare(go));
 
   root.querySelector('[data-show-lamp]')?.addEventListener('click', () => {
     showReveal(S.getDay(date), () => go('today'));
@@ -85,14 +98,16 @@ function entriesCard(day, c) {
       </div>
 
       <div class="stack" style="margin-top:16px;gap:12px">
-        ${day.entries.map((e) => entryRow(e, day.sealedAt)).join('')}
+        ${day.entries.map((e) => entryRow(e)).join('')}
         ${c.joys ? joyRow(day, c) : ''}
       </div>
     </section>
   `;
 }
 
-function entryRow(e, sealed) {
+/* 燈亮著也還是可以移。打錯字不該變成今天的紀錄——
+ * 移掉之後顏色會重算，移到一則不剩燈才收掉。 */
+function entryRow(e) {
   const st = KIND_STYLE[e.kind] || KIND_STYLE.deed;
   const label = S.KINDS[e.kind]?.short || '善行';
   return `
@@ -102,7 +117,7 @@ function entryRow(e, sealed) {
         <span class="task-name" style="display:block">${label}${e.pages ? ` · ${e.pages} 頁` : ''}</span>
         <span class="task-val" style="display:block">${esc(e.text)}</span>
       </span>
-      ${sealed ? '' : `<button class="btn chip" data-del="${e.id}" aria-label="移除這則">移除</button>`}
+      <button class="btn chip" data-del="${e.id}" aria-label="移除這則">移除</button>
     </div>
   `;
 }
@@ -125,10 +140,12 @@ function joyRow(day, c) {
 /**
  * 動作卡。
  *
- * 順序很重要：已經寫了東西的時候，「供今天的燈」要排第一。
- * 本來它排在「再寫一則」和四個類別按鈕的後面，變成第三順位，
- * 使用者寫完一則會以為還沒結束——真正的獎勵動作不該躲在
- * 兩個「再多做一點」的後面。
+ * 本來這裡的主角是「供今天的燈」。拿掉了：那個按鈕讓人想「再多寫幾則
+ * 一次供比較划算」，於是一直不按，然後忘記，隔天被系統補供——
+ * 最該屬於你的那一下反而是系統按的。
+ *
+ * 現在寫下去燈就亮了，這張卡的主角變成「再抽一次」：
+ * 補寫一則就多一次機會，而且只往上，晚點寫不會虧。
  */
 function actionsCard(day, c, left) {
   const kinds = [
@@ -138,61 +155,79 @@ function actionsCard(day, c, left) {
     ['note', '其他'],
   ];
 
-  const sealed = Boolean(day.sealedAt);
-  const canSeal = S.canSeal(day.date);
-  const depth = depthOf(S.statsOf(day));
+  const chips = `
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      ${kinds.map(([k, name]) => `<button class="btn chip" data-write="${k}">${name}</button>`).join('')}
+    </div>`;
 
-  // 供過燈之後就沒必要再催了，燈已經鑄好，寫是寫給自己的。
-  const nudge = sealed
-    ? '今天的燈已經供了，之後寫的不會改變它，但還是會記下來。'
-    : left === 0
-      ? '今天的三則寫完了。夠了，剩下的留給明天。'
-      : depth < 0.95
-        ? '再寫一則，比較有機會遇到少見的燈。不寫也沒關係。'
-        : '稀有的機會拉到最高了。';
-
-  if (sealed && left === 0) {
-    return `<div class="small center" style="padding:2px 10px">今天的三則都寫了。</div>`;
+  // 今天還什麼都沒有：燈還沒亮，這張卡只講一件事——寫一句。
+  if (!day.lamp) {
+    return `
+      <section class="card">
+        <div class="card-title">今天還沒寫</div>
+        <p class="small" style="margin-top:7px">
+          一則短短的就好。看到什麼、做了什麼、想到誰的好——寫一句，今天的燈就亮了。
+        </p>
+        <div style="margin-top:14px">${chips}</div>
+      </section>
+    `;
   }
+
+  const draws = S.drawsLeft(day);
+  if (draws === 0 && left === 0) {
+    return `<div class="small center" style="padding:2px 10px">今天三則都寫了，三次也抽完了。</div>`;
+  }
+
+  const nudge = draws > 0
+    ? '只會往上：抽到比較難得的才換，抽到普通的就留著現在這盞。'
+    : '再寫一則，就多一次抽的機會。不寫也沒關係，燈已經亮著了。';
 
   return `
     <section class="card">
-      ${canSeal ? `
-        <button class="btn btn-full" data-seal>供今天的燈</button>
+      ${draws > 0 ? `
+        <button class="btn btn-full" data-redraw>再抽一次${draws > 1 ? ` · 還有 ${draws} 次` : ''}</button>
         <div class="small" style="margin-top:10px">${nudge}</div>
-        <div class="small" style="margin-top:6px;color:var(--faint)">供了之後燈就固定了，但還是可以繼續寫。</div>
-      ` : sealed ? `
+      ` : `
         <div class="card-title">還想寫什麼</div>
         <p class="small" style="margin-top:7px">${nudge}</p>
-      ` : `
-        <div class="card-title">今天還沒寫</div>
-        <p class="small" style="margin-top:7px">
-          一則短短的就好。看到什麼、做了什麼、想到誰的好，寫一句就能供今天的燈。
-        </p>
       `}
 
       ${left > 0 ? `
-        <div style="margin-top:${canSeal ? '18px' : '14px'};${canSeal ? 'padding-top:16px;border-top:1px solid var(--line);' : ''}">
-          ${canSeal ? '<div class="tiny" style="margin-bottom:10px">還想寫的話</div>' : ''}
-          <div class="row" style="gap:8px;flex-wrap:wrap">
-            ${kinds.map(([k, name]) => `<button class="btn chip" data-write="${k}">${name}</button>`).join('')}
-          </div>
+        <div style="margin-top:${draws > 0 ? '18px' : '14px'};${draws > 0 ? 'padding-top:16px;border-top:1px solid var(--line);' : ''}">
+          ${draws > 0 ? '<div class="tiny" style="margin-bottom:10px">還想寫的話</div>' : ''}
+          ${chips}
         </div>` : ''}
     </section>
   `;
 }
 
+/** 今天那盞燈。底下那行講它亮在哪裡，按了可以改。 */
 function sealedCard(day) {
+  const groups = S.myGroups();
+  const shown = day.isPublic ? groups.filter((g) => S.shareTargets().includes(g.id)) : [];
+
+  const where = !isOnlineMode() || groups.length === 0
+    ? ''
+    : shown.length
+      ? `亮在 ${esc(shown.map((g) => g.name).join('、'))}`
+      : '只有你看得到';
+
   return `
-    <button class="card card-note" data-show-lamp style="width:100%;text-align:left;cursor:pointer">
-      <span class="row">
+    <section class="card card-note">
+      <button data-show-lamp class="row" style="width:100%;text-align:left;border:none;background:none;padding:0;cursor:pointer">
         <span style="flex-shrink:0">${renderLamp(day.lamp, { size: 34 })}</span>
         <span class="grow">
           <span style="display:block;font-size:.81rem;font-weight:500">今天供了「${esc(day.lamp.name)}」</span>
           <span class="small" style="display:block;margin-top:2px">按一下再看一次</span>
         </span>
-      </span>
-    </button>
+      </button>
+
+      ${where ? `
+        <div class="row" style="margin-top:12px;padding-top:10px;border-top:1px solid #F0E2C6">
+          <span class="tiny grow">${where}</span>
+          <button class="btn chip" data-share-to>改</button>
+        </div>` : ''}
+    </section>
   `;
 }
 
@@ -288,7 +323,7 @@ function openWrite(kind, go) {
       </div>
     </div>
 
-    <button class="btn btn-full" style="margin-top:16px" data-save>記下來</button>
+    <button class="btn btn-full" style="margin-top:16px" data-save>${day.lamp ? '記下來' : '記下來，供今天的燈'}</button>
   `, (el) => {
     const ta = el.querySelector('[data-text]');
     ta.focus();
@@ -313,39 +348,48 @@ function openWrite(kind, go) {
         S.setSutraName(el.querySelector('[data-sutra-name]').value);
       }
 
+      const before = S.getDay();
       const res = S.addEntry({ kind: current, text, pages });
       if (!res.ok) {
         return toast(res.reason === 'full' ? `一天 ${MAX_ENTRIES_PER_DAY} 則，今天寫完了` : '存不進去');
       }
 
-      // 已經發出去的那天又補寫，群裡看到的內容要跟著更新
+      closeSheet();
       const after = S.getDay();
-      if (after.sealedAt && after.isPublic && isOnlineMode()) {
+
+      // 今天第一則：燈剛剛亮起來，先問要讓哪幾個群看到，然後開獎。
+      if (!before.askedShare && after.entries.length === 1) return openShare(go, { reveal: true });
+
+      // 補寫：顏色跟著今天的紀錄變了，群裡看到的內容也要跟著更新。
+      if (after.isPublic && isOnlineMode()) {
         SB.publishLamp(after, S.shareTargets()).catch(() => {});
       }
 
-      closeSheet();
       go('today');
+      if (S.drawsLeft(after) > 0) toast('記下來了 · 可以再抽一次');
     });
   });
 }
 
-/* ── 供燈 ──
- * 供之前先問要不要發到群裡，以及發到哪幾個群。
- * 預設沿用上次的選擇，不必每天重選。 */
+/* ── 亮在哪幾個群 ──
+ *
+ * 燈在你寫下第一則的當下就亮了，這裡只決定它亮在哪裡。
+ * 預設沿用上次的選擇，不必每天重選；之後在今日卡片上按「改」還能再調。
+ */
 
-function openSeal(go) {
+function openShare(go, { reveal = false } = {}) {
   const day = S.getDay();
   const groups = S.myGroups();
 
-  // 沒連線或還沒加入任何群，就直接供，不要拿選單煩人。
-  if (!isOnlineMode() || groups.length === 0) return doSeal([], go);
+  // 沒連線或還沒加入任何群，就別拿選單煩人。
+  if (!isOnlineMode() || groups.length === 0) return applyShare([], go, reveal);
 
-  const picked = new Set(day.isPublic === false ? [] : S.shareTargets());
+  // 問過了而且當時選了不分享，才是真的都不勾；還沒問過就用預設（第一次是全選）。
+  const picked = new Set(day.askedShare && !day.isPublic ? [] : S.shareTargets());
 
   sheet(`
-    <h2>供今天的燈</h2>
-    <p class="small" style="margin-top:6px">要讓哪幾個群看到？不選也可以，燈一樣會亮，只是只有你看得到。</p>
+    <h2>${reveal ? '燈亮了' : '亮在哪幾個群'}</h2>
+    <p class="small" style="margin-top:6px">要讓哪幾個群看到？不選也可以，燈一樣亮著，只是只有你看得到。</p>
 
     <div class="stack" style="margin-top:16px;gap:10px">
       ${groups.map((g) => `
@@ -363,32 +407,52 @@ function openSeal(go) {
       只有你寫的那幾則會送出去，誦經頁數也會算進大眾合計。
     </p>
 
-    <button class="btn btn-full" style="margin-top:16px" data-go>供燈</button>
+    <button class="btn btn-full" style="margin-top:16px" data-go>${reveal ? '看今天的燈' : '好了'}</button>
   `, (el) => {
     el.querySelector('[data-go]').addEventListener('click', () => {
       const ids = [...el.querySelectorAll('[data-g]')].filter((x) => x.checked).map((x) => x.value);
       S.setShareTargets(ids);
       closeSheet();
-      doSeal(ids, go);
+      applyShare(ids, go, reveal);
     });
   });
 }
 
-function doSeal(groupIds, go) {
-  const sealed = S.seal();
-  if (!sealed.lamp) return;
+function applyShare(groupIds, go, reveal) {
+  const was = S.getDay();
+  const day = S.setPublic(groupIds.length > 0);
+  if (!day.lamp) return go('today');
 
-  S.setPublic(groupIds.length > 0);
-
-  // 發布是背景動作：失敗了燈還是亮著，不要卡住開獎那一刻。
+  // 送出去是背景動作：失敗了燈還是亮著，不要卡住開獎那一刻。
   if (groupIds.length) {
-    SB.publishLamp(sealed, groupIds)
-      .then((id) => { if (id) S.setRemoteId(id, sealed.date); })
+    SB.publishLamp(day, groupIds)
+      .then((id) => { if (id) S.setRemoteId(id, day.date); })
       .catch((e) => {
         console.warn('[燈燈] 發布失敗', e.message);
-        toast('燈供好了，但還沒送到群裡');
+        toast('燈亮著，但還沒送到群裡');
       });
+  } else if (was.isPublic && isOnlineMode()) {
+    SB.unpublishLamp(was).catch(() => {});
   }
 
-  showReveal(sealed, () => go('today'));
+  if (reveal) showReveal(day, () => go('today'));
+  else go('today');
+}
+
+/* ── 再抽一次 ──
+ *
+ * 只往上。補寫一則是多一次機會，不是拿已經到手的燈去賭——
+ * 不然就會有人為了不弄丟難得的燈而不敢再寫，那就本末倒置了。
+ */
+
+function doRedraw(go) {
+  const r = S.redraw();
+  if (!r) return;
+
+  const day = S.getDay();
+  if (day.isPublic && isOnlineMode()) {
+    SB.publishLamp(day, S.shareTargets()).catch(() => {});
+  }
+
+  showReveal(day, () => go('today'), { draw: r, onRedraw: () => doRedraw(go) });
 }
