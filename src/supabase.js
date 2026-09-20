@@ -21,7 +21,7 @@ async function client() {
           auth: { persistSession: true, autoRefreshToken: true },
         });
       } catch (e) {
-        console.warn('[燈燈] Supabase 載入失敗，改用單機模式', e);
+        console.warn('[燈燈悅心] Supabase 載入失敗，改用單機模式', e);
         return null;
       }
     })();
@@ -55,14 +55,14 @@ export async function ensureSession() {
       sessionUser = data.user;
       return sessionUser;
     }
-    console.warn('[燈燈] 本機的登入資料已失效，重新登入');
+    console.warn('[燈燈悅心] 本機的登入資料已失效，重新登入');
     // scope local：伺服器那邊的帳號可能已經不在了，別再打過去
     await sb.auth.signOut({ scope: 'local' }).catch(() => {});
   }
 
   const { data, error } = await sb.auth.signInAnonymously();
   if (error) {
-    console.warn('[燈燈] 匿名登入失敗', error.message);
+    console.warn('[燈燈悅心] 匿名登入失敗', error.message);
     return null;
   }
   sessionUser = data.user;
@@ -85,7 +85,7 @@ async function rpc(name, args, { silent = false } = {}) {
   const { data, error } = await sb.rpc(name, args);
   if (error) {
     if (silent) {
-      console.warn(`[燈燈] ${name} 失敗`, error.message);
+      console.warn(`[燈燈悅心] ${name} 失敗`, error.message);
       return null;
     }
     throw new Error(error.message);
@@ -104,7 +104,7 @@ export async function syncProfile() {
     display_name: me.name || '無名',
     avatar_char: me.avatarChar || '燈',
   });
-  if (error) console.warn('[燈燈] profile 同步失敗', error.message);
+  if (error) console.warn('[燈燈悅心] profile 同步失敗', error.message);
   return user.id;
 }
 

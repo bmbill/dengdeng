@@ -139,7 +139,7 @@ async function doShare(day, btn) {
     const r = await shareCard(day);
     if (r === 'saved') toast('圖卡存好了，可以傳給朋友');
   } catch (e) {
-    console.warn('[燈燈] 圖卡失敗', e);
+    console.warn('[燈燈悅心] 圖卡失敗', e);
     toast('圖卡做不出來，換個瀏覽器試試');
   } finally {
     btn.disabled = false;

@@ -428,7 +428,7 @@ function applyShare(groupIds, go, reveal) {
     SB.publishLamp(day, groupIds)
       .then((id) => { if (id) S.setRemoteId(id, day.date); })
       .catch((e) => {
-        console.warn('[燈燈] 發布失敗', e.message);
+        console.warn('[燈燈悅心] 發布失敗', e.message);
         toast('燈亮著，但還沒送到群裡');
       });
   } else if (was.isPublic && isOnlineMode()) {

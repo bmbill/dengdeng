@@ -117,7 +117,7 @@ async function load(root, go) {
       b.addEventListener('click', () => openReply(feed.find((x) => x.id === b.dataset.reply), root, go));
     });
   } catch (e) {
-    console.warn('[燈燈] 同行載入失敗', e);
+    console.warn('[燈燈悅心] 同行載入失敗', e);
     sub.textContent = '載入失敗';
     body.innerHTML = `<div class="empty">載入失敗了。<br>下拉重新整理，或稍後再試。</div>`;
   }
