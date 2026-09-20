@@ -53,6 +53,21 @@ export const FLAMES = {
   violet:    { name: '紫焰',   outer: '#9B7BB8', inner: '#F0E4F5', halo: '#C9B0DC' },
 };
 
+/* ── 鎏金 ──
+ *
+ * 難得的燈其實看不見：燈海裡畫得出來的只有一顆光點，形制要點開才知道，
+ * 而那顆光點的顏色是焰色（你的連續天數），只有大小是稀有度。
+ * 抽到難得卻幾乎看不出來，那個驚喜就沒有落地。
+ *
+ * 所以金不是第 12 種燈身色 —— 燈身色仍然是你決定的（今天寫了什麼）。
+ * 金是加在上面的一層：少見描一道金邊，難得整盞鎏金、連焰心都是金的。
+ * 這樣「顏色是你決定的，形制是運氣」沒有被打破，運氣只是多了顏色。
+ */
+export const GILT = { rim: '#F2DFA8', deep: '#9C7516', core: '#F8E6B0' };
+
+/** 金有名字才看得懂那道邊是什麼。常見的燈沒有金，也就沒有這一格。 */
+export const GILT_LABEL = { uncommon: '描金', rare: '鎏金' };
+
 /* ── 形制 ──
  * tier: common / uncommon / rare
  * 名字取自佛教燈供的實際形制，不是隨便編的。 */
@@ -393,6 +408,9 @@ const FORM_ART = {
   }),
 };
 
+/** 缽身。鎏金要沿著同一條路徑描，所以抽出來共用。 */
+const BOWL = 'M8 31h28c0 7.8-6.3 12.6-14 12.6S8 38.8 8 31z';
+
 /**
  * 把一盞燈畫成 SVG 字串。
  * @param {{form:string, bowl:string, flame:string}} lamp
@@ -404,6 +422,9 @@ export function renderLamp(lamp, opts = {}) {
   const f = FLAMES[lamp.flame] || FLAMES.gamboge;
   const art = (FORM_ART[lamp.form] || FORM_ART.round)();
 
+  // 沒點亮的灰燈不鎏金。舊資料沒存 tier，從形制查得回來。
+  const tier = lit ? (lamp.tier || FORMS[lamp.form]?.tier || 'common') : 'common';
+
   const vars = lit
     ? `--dark:${b.dark};--light:${b.light};--foot:${b.foot};--flame-outer:${f.outer};--flame-halo:${f.halo}`
     : '--dark:#DDD2BE;--light:#E6DDCB;--foot:#CFC2AA;--flame-outer:#DDD2BE;--flame-halo:#E6DDCB';
@@ -411,7 +432,7 @@ export function renderLamp(lamp, opts = {}) {
   const flame = lit
     ? `<ellipse cx="22" cy="17" rx="10.5" ry="14" fill="${f.halo}" opacity=".45"/>
        <path d="M22 5.5c4.4 6 6.8 9.3 6.8 12.9a6.8 6.8 0 0 1-13.6 0c0-3.6 2.4-6.9 6.8-12.9z" fill="${f.outer}"/>
-       <path d="M22 13.6c2.1 3.3 3.1 5 3.1 6.6a3.1 3.1 0 0 1-6.2 0c0-1.6 1-3.3 3.1-6.6z" fill="${f.inner}"/>`
+       <path d="M22 13.6c2.1 3.3 3.1 5 3.1 6.6a3.1 3.1 0 0 1-6.2 0c0-1.6 1-3.3 3.1-6.6z" fill="${tier === 'rare' ? GILT.core : f.inner}"/>`
     : '';
 
   // xmlns 是必要的：內嵌在 HTML 裡沒差，但把這串 SVG 當成圖片載入
@@ -419,12 +440,26 @@ export function renderLamp(lamp, opts = {}) {
   // 紋樣畫在缽身上。舊資料沒有這個欄位，就當素面。
   const pattern = lit ? (PATTERN_ART[lamp.pattern] || '') : '';
 
+  // 金邊描兩道：深的在下、亮的在上。一道不夠——泥金的燈身本來就是金的，
+  // 單描一條亮金等於沒描；有了深色那道才有邊，深淺燈身都看得出來。
+  const edge = (d, w, cap) =>
+    `<path d="${d}" fill="none" stroke="${GILT.deep}" stroke-width="${w + 1.2}" stroke-linejoin="round" stroke-linecap="${cap}" opacity=".55"/>`
+    + `<path d="${d}" fill="none" stroke="${GILT.rim}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="${cap}"/>`;
+
+  // 難得描整圈（那條路徑自己就含缽口），少見只描缽口那一道。
+  const gilt = tier === 'rare'
+    ? edge(BOWL, 1.4, 'round')
+    : tier === 'uncommon'
+      ? edge('M8 31h28', 1.3, 'round')
+      : '';
+
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${Math.round(size * 50 / 44)}" viewBox="0 0 44 50" fill="none" style="${vars}" role="img" aria-label="${lamp.name || '燈'}">
     ${art.behind}
     ${flame}
-    <path d="M8 31h28c0 7.8-6.3 12.6-14 12.6S8 38.8 8 31z" fill="var(--dark)"/>
+    <path d="${BOWL}" fill="var(--dark)"/>
     <path d="M8 31h28c0 2.5-.7 4.7-1.9 6.5H9.9C8.7 35.7 8 33.5 8 31z" fill="var(--light)"/>
     ${pattern}
+    ${gilt}
     ${art.front}
   </svg>`;
 }
@@ -467,11 +502,25 @@ export function glowOf(joyCount) {
 export function renderSpark(lamp, px, glow = 0) {
   const f = FLAMES[lamp.flame] || FLAMES.gamboge;
   const g = Math.max(0, Math.min(1, glow));
+  const tier = lamp.tier || 'common';
 
   const core = px * (1 + 0.5 * g);
   const halo = Math.round(core * (3.2 + 2.6 * g));
   const haloAlpha = (0.85 + 0.15 * g).toFixed(2);
 
-  return `<span class="halo${g > 0.45 ? ' bright' : ''}" style="width:${halo}px;height:${halo}px;opacity:${haloAlpha};background:radial-gradient(circle, ${f.halo} 0%, transparent 70%)"></span>
-          <span style="position:relative;display:block;width:${core.toFixed(1)}px;height:${core.toFixed(1)}px;border-radius:50%;background:${f.outer};box-shadow:0 0 ${(core * g * 1.4).toFixed(1)}px ${f.halo}"></span>`;
+  // 鎏金在這裡是一圈金邊，不是更亮 —— 亮度已經被隨喜佔走了，
+  // 兩件事用同一個訊號就會分不出「難得」和「很多人隨喜」。
+  // 先墊一圈夜色再描金：白焰的芯本來就接近金，沒有那道縫的話
+  // 金邊會貼在芯上看不出來。
+  const gap = 'rgba(24,34,46,.85)';
+  const ring = tier === 'rare'
+    ? `,0 0 0 1px ${gap},0 0 0 2.6px ${GILT.rim},0 0 ${(core * 1.5).toFixed(1)}px ${GILT.rim}`
+    : tier === 'uncommon' ? `,0 0 0 .8px ${gap},0 0 0 1.9px ${GILT.rim}` : '';
+
+  const haloBg = tier === 'rare'
+    ? `radial-gradient(circle, ${f.halo} 0%, ${GILT.rim}59 40%, transparent 70%)`
+    : `radial-gradient(circle, ${f.halo} 0%, transparent 70%)`;
+
+  return `<span class="halo${g > 0.45 ? ' bright' : ''}" style="width:${halo}px;height:${halo}px;opacity:${haloAlpha};background:${haloBg}"></span>
+          <span style="position:relative;display:block;width:${core.toFixed(1)}px;height:${core.toFixed(1)}px;border-radius:50%;background:${f.outer};box-shadow:0 0 ${(core * g * 1.4).toFixed(1)}px ${f.halo}${ring}"></span>`;
 }

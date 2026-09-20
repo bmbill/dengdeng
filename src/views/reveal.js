@@ -7,7 +7,7 @@
 
 import * as S from '../store.js';
 import { esc, icon, fullscreen, toast } from '../ui.js';
-import { renderLamp, TIER_LABEL, TIER_RANK, FLAMES, BOWLS, FORMS } from '../lamp.js';
+import { renderLamp, TIER_LABEL, TIER_RANK, GILT_LABEL, FLAMES, BOWLS, FORMS } from '../lamp.js';
 import { sayingFor, quoteFor, citationOf } from '../quotes.js';
 import { shareCard } from '../share.js';
 
@@ -58,7 +58,7 @@ export function showReveal(day, onClose, opts = {}) {
 
       <div class="tags">
         <span class="tag rare">${TIER_LABEL[lamp.tier]}${sameForm > 1 ? ` · 第 ${sameForm} 次遇見` : ' · 初次遇見'}</span>
-        <span class="tag info">${FLAMES[lamp.flame].name} · ${BOWLS[lamp.bowl].name}</span>
+        <span class="tag info">${FLAMES[lamp.flame].name} · ${BOWLS[lamp.bowl].name}${GILT_LABEL[lamp.tier] ? ` · ${GILT_LABEL[lamp.tier]}` : ''}</span>
       </div>
     </div>
 

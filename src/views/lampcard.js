@@ -12,11 +12,11 @@
 import * as S from '../store.js';
 import * as SB from '../supabase.js';
 import { esc, sheet, closeSheet, toast } from '../ui.js';
-import { renderLamp, TIER_LABEL, BOWLS, FLAMES } from '../lamp.js';
+import { renderLamp, TIER_LABEL, GILT_LABEL, BOWLS, FLAMES } from '../lamp.js';
 
 /** 燈的細節，一行灰字就好。 */
 function lampFootnote(l) {
-  const bits = [l.name, TIER_LABEL[l.tier], FLAMES[l.flame]?.name, BOWLS[l.bowl]?.name]
+  const bits = [l.name, TIER_LABEL[l.tier], GILT_LABEL[l.tier], FLAMES[l.flame]?.name, BOWLS[l.bowl]?.name]
     .filter(Boolean);
   return `
     <div class="card-foot">
