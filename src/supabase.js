@@ -162,11 +162,23 @@ async function rejoinFromLocal() {
       await rpc('join_group', { code });
       ok += 1;
     } catch (e) {
+      // 這台已經被接走了。再試下去只會把同一則錯誤跑一遍，
+      // 而且真的接回去的話群裡就會多出一個同名的人。
+      if (isRetired(e)) { retiredMsg = e.message; return 'retired'; }
       console.warn('[燈燈悅心] 用邀請碼接回失敗', code, e.message);
     }
   }
   return ok > 0;
 }
+
+/** 伺服器說這個身分已經被另一台手機接走了。 */
+function isRetired(e) {
+  return String(e?.message || '').includes('接到另一台手機');
+}
+
+// 被接走的裝置，開場對帳時要講一句。myGroups() 自己會把這個狀況
+// 吞掉（回 null 才不會洗掉本機的群組清單），所以記在這裡讓 catchUp 拿。
+let retiredMsg = null;
 
 /**
  * 我加入的所有群。順便寫回本機，離線時選單還有東西可顯示。
@@ -179,9 +191,13 @@ export async function myGroups({ silent = true, heal = true } = {}) {
   const rows = await rpc('my_groups', {}, { silent });
   if (!rows) return null;
 
-  if (!rows.length && heal && await rejoinFromLocal()) {
+  if (!rows.length && heal) {
+    const healed = await rejoinFromLocal();
+    // 被接走的裝置：不要把本機那份群組清單洗掉。
+    // 它已經寫不進東西了，清單留著至少畫面上還看得懂發生什麼事。
+    if (healed === 'retired') return null;
     // heal: false —— 接回去之後還是空的就認了，不要無限重試
-    return myGroups({ silent, heal: false });
+    if (healed) return myGroups({ silent, heal: false });
   }
 
   const groups = rows.map((g) => ({
@@ -304,17 +320,19 @@ export async function resendPublic({ limit = 90 } = {}) {
  * @returns 補送了幾盞
  */
 export async function catchUp() {
-  if (!isOnlineMode()) return 0;
+  if (!isOnlineMode()) return { sent: 0 };
   try {
     // 名字放在這裡同步，不放在加入群的時候——被管理員直接加進群的人
     // 從來不會經過那條路，群裡就會看到一個「無名」。
     await syncProfile();
     const groups = await myGroups();
-    if (!groups || !groups.length) return 0;
-    return await resendPublic();
+    if (retiredMsg) return { sent: 0, retired: retiredMsg };
+    if (!groups || !groups.length) return { sent: 0 };
+    return { sent: await resendPublic() };
   } catch (e) {
+    if (isRetired(e)) return { sent: 0, retired: e.message };
     console.warn('[燈燈悅心] 開場對帳失敗', e.message);
-    return 0;
+    return { sent: 0 };
   }
 }
 

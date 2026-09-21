@@ -87,9 +87,12 @@ function boot() {
 
   // 標記為公開、卻沒真的送到群裡的燈，開場補一次。
   // 慢慢來沒關係，所以不 await——畫面先出來，補好了再說一聲。
-  SB.catchUp().then((n) => {
-    if (!n) return;
-    toast(n === 1 ? '補送了 1 盞燈到群裡' : `補送了 ${n} 盞燈到群裡`);
+  SB.catchUp().then(({ sent, retired }) => {
+    // 這台的紀錄已經接到另一台手機了。講清楚，不然使用者只會看到
+    // 一個什麼都寫不進去、群也不見了的 app，完全不知道為什麼。
+    if (retired) return toast(retired);
+    if (!sent) return;
+    toast(sent === 1 ? '補送了 1 盞燈到群裡' : `補送了 ${sent} 盞燈到群裡`);
     if (current === 'sea' || current === 'together') go(current);
   }).catch(() => {});
 }
