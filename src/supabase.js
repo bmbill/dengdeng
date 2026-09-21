@@ -128,10 +128,47 @@ export async function syncProfile() {
 
 /* ── 群組 ── */
 
-/** 我加入的所有群。順便寫回本機，離線時選單還有東西可顯示。 */
-export async function myGroups({ silent = true } = {}) {
+/**
+ * 伺服器說我一個群都沒有，可是本機記著群、還記著邀請碼——
+ * 這個組合只有一個意思：身分換了（匯入了別台的備份、帳號被刪掉、
+ * 專案重建）。拿本機那些邀請碼自己接回去。
+ *
+ * 用 rpc 而不是 joinGroup()，因為 joinGroup() 會回頭呼叫 myGroups()。
+ * @returns 有沒有接回任何一個
+ */
+async function rejoinFromLocal() {
+  const codes = S.myGroups().map((g) => g.inviteCode).filter(Boolean);
+  if (!codes.length) return false;
+
+  await syncProfile().catch(() => {});
+  let ok = 0;
+  for (const code of codes) {
+    try {
+      await rpc('join_group', { code });
+      ok += 1;
+    } catch (e) {
+      console.warn('[燈燈悅心] 用邀請碼接回失敗', code, e.message);
+    }
+  }
+  return ok > 0;
+}
+
+/**
+ * 我加入的所有群。順便寫回本機，離線時選單還有東西可顯示。
+ *
+ * 伺服器回空陣列是「成功」的回應，所以會一路走到 setGroups([])，
+ * 把本機那份連同邀請碼一起洗掉——連自己接回去的路都沒了。
+ * 所以在寫回去之前先試著接回來：換了身分的人不該因此弄丟群。
+ */
+export async function myGroups({ silent = true, heal = true } = {}) {
   const rows = await rpc('my_groups', {}, { silent });
   if (!rows) return null;
+
+  if (!rows.length && heal && await rejoinFromLocal()) {
+    // heal: false —— 接回去之後還是空的就認了，不要無限重試
+    return myGroups({ silent, heal: false });
+  }
+
   const groups = rows.map((g) => ({
     id: g.id,
     name: g.name,
