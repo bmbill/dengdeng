@@ -192,14 +192,20 @@ export async function publishLamp(day, groupIds) {
 }
 
 /**
- * 補送「標記為公開、但其實沒送出去」的燈。
+ * 補送「標記為公開、但其實沒在群裡」的燈。
  *
- * 會有這種燈，是因為供燈時如果一個群都沒選到（例如換手機後還沒加入群），
- * 發布那一步整個跳過——燈只留在本機。等她加回群，這些燈得補送，
- * 不然群裡永遠看不到她那幾天。
+ * 要補的原因不只一種：供燈時還沒加入任何群、當下離線、
+ * 或者那幾天是在別的身分底下供的（換手機、匯入備份）。
  *
- * 只補沒有 remoteId 的，所以不會把老早就送過的整批重送；
- * 也刻意不補「沒標記公開」的，加入新群不該把過去的私人紀錄倒進去。
+ * 判斷「這一天到底送到了沒」要問伺服器，不能看本機的 remoteId——
+ * 那個標記只記得「發布這個動作成功過」，不記得發布到了哪裡。
+ * 一盞在還沒加入群的時候供的燈照樣拿得到 remoteId，於是被跳過，
+ * 可是它一個群都沒進。my_shared_days() 直接從 lamp_shares 回答，
+ * 而且只算 auth.uid() 自己的，所以上面那幾種情況一次蓋掉。
+ *
+ * 刻意不補「沒標記公開」的：加入新群不該把過去的私人紀錄倒進去。
+ * 也刻意信任伺服器說「這天有分享」——那幾天可能是使用者自己挑了
+ * 某幾個群，不該被補送推到其他群去。
  *
  * @returns 補送了幾盞
  */
@@ -207,8 +213,15 @@ export async function resendPublic({ limit = 90 } = {}) {
   const groupIds = S.shareTargets();
   if (!groupIds.length) return 0;
 
+  const rows = await rpc('my_shared_days', {}, { silent: true });
+  // 問不到就不要亂猜。整批重送的代價比少送一次高。
+  if (!rows) return 0;
+  // setof date 回來可能是 ['2026-09-19'] 也可能是 [{my_shared_days:'2026-09-19'}]，
+  // 看 PostgREST 版本。兩種都接。
+  const done = new Set(rows.map((r) => (typeof r === 'string' ? r : Object.values(r)[0])));
+
   const pending = S.lamps()
-    .filter((d) => d.isPublic && !d.remoteId)
+    .filter((d) => d.isPublic && !done.has(d.date))
     .slice(-limit)
     .reverse();
 
