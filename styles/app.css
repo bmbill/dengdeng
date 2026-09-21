@@ -347,7 +347,112 @@ button.sea-lamp:focus-visible { outline: 2px solid var(--night-ink); outline-off
   50% { opacity: .85; }
 }
 
-/* ── 我的／大家的 ── */
+/* ══════════════════ 場景 ══════════════════
+ *
+ * 底是第幾片天空決定的（三種循環），真實的時辰再疊一層上去。
+ * 冬天飄雪、清晨天色轉淡——月相本來就跟外面同步，這是同一件事往下接。 */
+
+.sea.sc-lake   { background: linear-gradient(180deg, #1B2740 0%, #101A2C 100%); }
+.sea.sc-valley { background: linear-gradient(180deg, #212C3A 0%, #141E29 100%); }
+.sea.tod-dawn  { background: linear-gradient(180deg, #2B3A4E 0%, #3C4A55 100%); }
+.sea.tod-dusk  { background: linear-gradient(180deg, #2A2C3C 0%, #3B3040 100%); }
+
+/* 水面。地平線在 bottom:94px，水從那裡往下。 */
+.sky-water {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 100px; z-index: 0;
+  background: linear-gradient(180deg, rgba(42, 60, 92, .95) 0%, rgba(14, 24, 40, .98) 100%);
+}
+
+/* 倒影。
+   不是照鏡子——真的照鏡子，天上那盞的倒影會落到畫面外。
+   壓成 .45 倍，全部收在水面那一塊裡，再往深處淡掉。 */
+.sky-reflect {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  opacity: .4; filter: blur(1.1px);
+  transform-origin: 50% calc(100% - 100px);
+  animation: ripple 9s ease-in-out infinite;
+  /* 遮罩是在翻轉前的座標算的，所以「深處」是這裡的上緣 */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 48%);
+          mask-image: linear-gradient(to bottom, transparent 0%, #000 48%);
+}
+@keyframes ripple {
+  0%, 100% { transform: scaleY(-.45) translateX(0); }
+  50%      { transform: scaleY(-.45) translateX(3px); }
+}
+
+/* 遠山。山谷那一景的底。 */
+.sky-range {
+  position: absolute; left: 0; right: 0; bottom: 94px;
+  width: 100%; height: 86px; z-index: 0;
+}
+.range-far  { fill: #26364A; }
+.range-near { fill: #1C2A3A; }
+
+/* 出家人。比路人少見得多（六分半一趟），走到中間會停下來合掌——
+   停的那幾秒才是重點，一路走過去就只是另一個路人。 */
+.sky-monk {
+  position: absolute; bottom: 94px; z-index: 2;
+  width: 14px; height: 22px;
+  animation: monk-walk 390s linear infinite;
+  pointer-events: none;
+}
+.sky-monk svg {
+  display: block; width: 100%; height: 100%; fill: #4E6076;
+  transform-origin: 50% 100%;
+  animation: monk-bow 390s linear infinite;
+}
+@keyframes monk-walk {
+  0%, 88%      { right: -8%;  opacity: 0; }
+  88.6%        { right: -8%;  opacity: .95; }
+  94%, 96.4%   { right: 46%;  opacity: .95; }
+  99.6%        { right: 104%; opacity: .95; }
+  100%         { right: 104%; opacity: 0; }
+}
+@keyframes monk-bow {
+  0%, 94.2%      { transform: none; }
+  94.9%, 95.7%   { transform: translateY(1.5px) scaleY(.92); }
+  96.4%, 100%    { transform: none; }
+}
+
+/* 河燈。飄的方向跟風一致，不然畫面會打架。 */
+.sky-river {
+  position: absolute; bottom: 88px; z-index: 1;
+  width: 14px; height: 11px; pointer-events: none;
+}
+.sky-river svg { display: block; width: 100%; height: 100%; fill: #3E5268; }
+.sky-river.r0 { animation: adrift 120s linear infinite; }
+.sky-river.r1 { animation: adrift 150s linear -40s infinite; bottom: 91px; opacity: .8; }
+.sky-river.r2 { animation: adrift 186s linear -95s infinite; bottom: 93px; opacity: .62; }
+@keyframes adrift { from { left: -6%; } to { left: 104%; } }
+
+/* 一行雁。五分鐘才一趟，飛過去就沒了。 */
+.sky-geese {
+  position: absolute; top: 17%; z-index: 1;
+  width: 62px; height: 32px; opacity: 0;
+  animation: geese-fly 300s linear infinite;
+  pointer-events: none;
+}
+.sky-geese svg { display: block; width: 100%; height: 100%; fill: none; stroke: #5A6E85; stroke-width: 1.3; stroke-linecap: round; }
+@keyframes geese-fly {
+  0%, 90%  { left: -18%; opacity: 0; }
+  90.6%    { opacity: .8; }
+  99.4%    { left: 110%; opacity: .8; }
+  100%     { left: 110%; opacity: 0; }
+}
+
+/* 雪。冬天才有，而且不能多——雪一多就看不到燈了。 */
+.sky-snow {
+  position: absolute; top: -8px; border-radius: 50%;
+  background: #DCE6F0; pointer-events: none;
+  animation-name: snow-fall; animation-timing-function: linear; animation-iteration-count: infinite;
+}
+@keyframes snow-fall {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  12%  { opacity: .55; }
+  88%  { opacity: .5; }
+  100% { transform: translate(20px, 370px); opacity: 0; }
+}
+
 .seg {
   display: flex; gap: 4px; padding: 4px;
   background: var(--paper-2); border-radius: var(--r-m);
@@ -359,6 +464,8 @@ button.sea-lamp:focus-visible { outline: 2px solid var(--night-ink); outline-off
   transition: background .2s ease, color .2s ease;
 }
 .seg button.on { background: var(--card); color: var(--cinnabar-d); box-shadow: 0 1px 4px rgba(120, 95, 60, .1); }
+
+/* ── 我的／大家的 ── */
 
 /* ── 一片一片往回翻 ── */
 .sky-nav { display: flex; align-items: center; gap: 10px; }

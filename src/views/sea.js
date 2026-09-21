@@ -10,154 +10,9 @@ import * as S from '../store.js';
 import * as SB from '../supabase.js';
 import { esc, icon, sheet, closeSheet, toast } from '../ui.js';
 import { showMyDay, showSharedLamp } from './lampcard.js';
-import { renderLamp, renderSpark, glowOf, TIER_LABEL, BOWLS, FLAMES } from '../lamp.js';
+import { renderLamp, renderSpark, glowOf } from '../lamp.js';
+import { stageClasses, sceneryHTML, nextMilestone, sceneOf, SKY_STAGES, LIFE_STAGES } from '../sky.js';
 import { SKY_SIZE, SKY_RENDER_CAP, isOnlineMode } from '../config.js';
-
-/* ── 里程碑 ──
- *
- * 每一個都要真的讓畫面出現東西。
- * 本來只是幾行字（「再 6 盞，燈海起了風」），但 7 盞到了什麼也沒發生——
- * 那等於 app 在承諾一件它不做的事。
- *
- * 現在每一階都對應夜空裡的一樣東西，文案寫的就是你會看到的。 */
-
-const MILESTONES = [
-  { at: 7,   cls: 'windy', label: '燈會開始隨風飄' },
-  { at: 21,  cls: 'reeds', label: '岸邊長出草，偶爾有人走過' },
-  { at: 49,  cls: 'pagoda', label: '遠處浮起一座塔，塔上偶爾亮燈' },
-  { at: 108, cls: 'moon',  label: '天上出現月亮' },
-  { at: 365, cls: 'stars', label: '滿天都是星' },
-];
-
-/** 已經到達的階段，變成夜空的 class。 */
-export function stageClasses(count) {
-  return MILESTONES.filter((m) => count >= m.at).map((m) => m.cls).join(' ');
-}
-
-/** 夜空裡那些「長出來」的東西。 */
-export function scenery(count) {
-  const has = (at) => count >= at;
-  return `
-    ${has(108) ? moon() : ''}
-    ${has(365) ? starField() : ''}
-    ${has(49) ? `<svg class="sky-pagoda" viewBox="0 0 80 96" fill="none" aria-hidden="true">
-      <path d="M40 4l20 12H20z"/><path d="M26 16h28v10H26z"/>
-      <path d="M40 26l24 12H16z"/><path d="M24 38h32v12H24z"/>
-      <path d="M40 50l28 14H12z"/><path d="M22 64h36v22H22z"/>
-      <path d="M8 86h64v10H8z"/>
-      <rect class="tower-lamp a" x="35" y="69" width="10" height="11" rx="1.4"/>
-      <rect class="tower-lamp b" x="36" y="41" width="8" height="7" rx="1.2"/>
-    </svg>` : ''}
-    ${has(21) ? walker() + reeds() : ''}
-  `;
-}
-
-/**
- * 月亮，而且跟外面真的月亮同一個月相。
- *
- * 關鍵是：暗面不畫。
- * 本來用「天空色的實心陰影」去切，等於在天空上蓋一塊不透明的深色圓，
- * 所以暗的那半看得見，而且會擋住後面的燈。
- * 現在用遮罩只畫亮的部分，其餘完全透明。
- */
-function moonPhase(date = new Date()) {
-  const ref = Date.UTC(2000, 0, 6, 18, 14);        // 一個已知的朔
-  const syn = 29.530588853 * 86400000;             // 朔望月
-  let p = ((date.getTime() - ref) % syn) / syn;
-  if (p < 0) p += 1;
-  return p;                                        // 0 是朔、0.5 是望
-}
-
-let moonSeq = 0;
-
-function moon() {
-  const p = moonPhase();
-  const cosT = Math.cos(2 * Math.PI * p);
-  // 亮的比例。全黑的朔留一點點，不然「天上出現月亮」會看不到東西。
-  const k = Math.max(0.055, (1 - cosT) / 2);
-  const waxing = p < 0.5;                          // 上弦：北半球亮在右邊
-  const gibbous = k > 0.5;
-  const rx = (Math.abs(cosT) * 20).toFixed(2);
-  const id = `mn${++moonSeq}`;
-
-  // 亮的那半圓：上弦走右邊（sweep 1），下弦走左邊（sweep 0）
-  const half = `M20 0A20 20 0 0 ${waxing ? 1 : 0} 20 40Z`;
-
-  return `<span class="sky-moon">
-    <svg viewBox="0 0 40 40" aria-hidden="true">
-      <mask id="${id}">
-        <rect width="40" height="40" fill="#000"/>
-        <path d="${half}" fill="#fff"/>
-        <ellipse cx="20" cy="20" rx="${rx}" ry="20" fill="${gibbous ? '#fff' : '#000'}"/>
-      </mask>
-      <circle cx="20" cy="20" r="20" fill="#E8E2D2" mask="url(#${id})"/>
-    </svg>
-  </span>`;
-}
-
-function starField() {
-  return [...Array(26)].map((_, i) => {
-    const x = (8 + 84 * ((i * 0.7548776662) % 1)).toFixed(1);
-    const y = (6 + 56 * ((i * 0.5698402909) % 1)).toFixed(1);
-    const s = (0.8 + (i % 3) * 0.5).toFixed(1);
-    return `<span class="sky-star" style="left:${x}%;top:${y}%;width:${s}px;height:${s}px;animation-delay:${(i % 7) * 0.6}s"></span>`;
-  }).join('');
-}
-
-/**
- * 岸邊的草。
- *
- * 本來是一根根細線條，在深色天空上看起來像刮痕，不像植物——
- * 旁邊的塔是實心剪影，一比就輸了。同一張圖裡不該有兩種畫法。
- *
- * 改成剪影，而且分遠近兩層：遠的矮、淺、密，近的高、深、疏。
- * 只有一層會很平，看起來像貼上去的貼紙。
- */
-function grassLayer(count, maxH, salt, cls) {
-  const W = 320;
-  const step = W / count;
-  let d = `M0 40`;
-
-  for (let i = 0; i < count; i++) {
-    const x = i * step;
-    // 瘦而高才像草。寬而尖會變成松林。
-    const w = step * (0.42 + ((i * 7 + salt) % 5) * 0.09);
-    const h = maxH * (0.5 + ((i * 13 + salt) % 9) / 11);
-    const lean = (((i * 5 + salt) % 7) - 3) * (w * 0.55);
-    const tip = x + w / 2 + lean;
-
-    // 兩側各自彎，葉子才不會左右對稱得像三角形
-    d += ` L${x.toFixed(1)} 40`
-       + ` Q${(x + w * 0.1 + lean * 0.4).toFixed(1)} ${(40 - h * 0.55).toFixed(1)} ${tip.toFixed(1)} ${(40 - h).toFixed(1)}`
-       + ` Q${(x + w * 0.9 + lean * 0.4).toFixed(1)} ${(40 - h * 0.45).toFixed(1)} ${(x + w).toFixed(1)} 40`;
-  }
-
-  return `<path class="${cls}" d="${d} L${W} 40 Z"/>`;
-}
-
-/**
- * 偶爾有人走過。
- *
- * 一趟走完大約 35 秒，但整個循環是 4 分鐘——所以多數時候畫面上沒有人，
- * 你偶爾抬頭才會看到有個影子在走。常常出現就不稀奇了。
- *
- * 放在草前面（z-index 2），因為它走的是近岸；藏在草後面只會看到一顆頭。
- */
-function walker() {
-  return `<span class="sky-walker" aria-hidden="true">
-    <svg viewBox="0 0 16 26" fill="none">
-      <circle cx="8" cy="4.2" r="3.2"/>
-      <path d="M8 7.6c-2.8 0-4.4 2.2-4.9 7L2 24h12l-1.1-9.4c-.5-4.8-2.1-7-4.9-7z"/>
-    </svg>
-  </span>`;
-}
-
-function reeds() {
-  return `<svg class="sky-reeds" viewBox="0 0 320 40" preserveAspectRatio="none" fill="none" aria-hidden="true">
-    ${grassLayer(40, 24, 0, 'grass-far')}
-    ${grassLayer(26, 37, 4, 'grass-near')}
-  </svg>`;
-}
 
 /* 跨重繪保留的檢視狀態 */
 const view = {
@@ -222,7 +77,7 @@ function segmented(groups) {
 function renderMine(root, go) {
   const list = S.lamps();
   const t = S.totals();
-  const next = MILESTONES.find((m) => m.at > list.length);
+  const next = nextMilestone(list.length);
   const streak = S.currentStreak();
   const body = root.querySelector('[data-body]');
 
@@ -237,8 +92,8 @@ function renderMine(root, go) {
       <div class="stat"><b style="color:var(--azurite-d)">${t.pages}</b><span>頁經</span></div>
     </div>
 
-    <div class="sea ${stageClasses(list.length)}">
-      ${scenery(list.length)}
+    <div class="sea ${stageClasses({ filled: list.length })}">
+      ${sceneryHTML({ filled: list.length })}
       ${list.length
         ? scatter(list.map((d) => ({ key: d.date, lamp: d.lamp, mineDate: d.date })), { avoidMoon: list.length >= 108 })
         : `<div class="empty" style="color:var(--night-muted);position:relative;z-index:2">寫一則短短的<br>這裡就會亮起第一盞</div>`}
@@ -264,7 +119,8 @@ function renderMine(root, go) {
 }
 
 function milestone(count, next) {
-  const prev = MILESTONES.filter((m) => m.at <= count).pop();
+  const prev = [...SKY_STAGES, ...LIFE_STAGES]
+    .filter((m) => m.at <= count && m.at < next.at).pop();
   const from = prev ? prev.at : 0;
   const pct = Math.round(((count - from) / (next.at - from)) * 100);
   return `
@@ -274,7 +130,7 @@ function milestone(count, next) {
           ${renderLamp({ form: 'pagoda', bowl: 'cinnabar', flame: 'gamboge' }, { size: 30, lit: false })}
         </span>
         <span class="grow">
-          <span style="display:block;font-size:.81rem;font-weight:500">再 ${next.at - count} 盞，${esc(next.label)}</span>
+          <span style="display:block;font-size:.81rem;font-weight:500">再 ${next.left} 盞，${esc(next.label)}</span>
           <span class="bar" style="display:block;margin-top:7px"><i style="width:${pct}%"></i></span>
           <span class="tiny" style="display:block;margin-top:6px">${count} / ${next.at}</span>
         </span>
@@ -324,22 +180,29 @@ async function renderGroup(root, go) {
   const isNow = view.skyBack === 0;
   const hasPrev = view.skyBack + 1 < info.totalSkies;
 
+  // 這個群一共供過幾盞。一片上限就是 108，所以只看「這一片」的話
+  // 49 以上幾乎沒東西可長——景要分兩層，這是另外那一層。
+  const reached = (info.skyNo - 1) * info.size + info.filled;
+  const scene = sceneOf(info.skyNo);
+  const spots = layoutOf(lamps.map((l) => ({
+    key: l.id, lamp: l.lamp, id: l.id, joined: l.joinedByMe, joys: l.joyCount,
+  })), { avoidMoon: info.filled >= 108 });
+
   body.innerHTML = `
     <div class="sky-nav">
       <button class="btn chip" data-prev aria-label="上一片天空" ${hasPrev ? '' : 'disabled'}>◀</button>
       <div class="grow center">
-        <div class="serif" style="font-size:.94rem;font-weight:600">第 ${info.skyNo} 片天空</div>
+        <div class="serif" style="font-size:.94rem;font-weight:600">第 ${info.skyNo} 片 · ${scene.name}</div>
         <div class="tiny" style="margin-top:2px">${skyDates(info)}</div>
       </div>
       <button class="btn chip" data-next aria-label="下一片天空" ${isNow ? 'disabled' : ''}>▶</button>
     </div>
 
-    <div class="sea ${stageClasses(info.filled)}">
-      ${scenery(info.filled)}
+    <div class="sea ${stageClasses({ filled: info.filled, reached, skyNo: info.skyNo })}">
+      ${sceneryHTML({ filled: info.filled, reached, skyNo: info.skyNo })}
+      ${shown && scene.key === 'lake' ? `<div class="sky-reflect" aria-hidden="true">${reflect(spots)}</div>` : ''}
       ${shown
-        ? scatter(lamps.map((l) => ({
-            key: l.id, lamp: l.lamp, id: l.id, joined: l.joinedByMe, joys: l.joyCount,
-          })), { avoidMoon: info.filled >= 108 })
+        ? paint(spots)
         : `<div class="empty" style="color:var(--night-muted);position:relative;z-index:2">這片天空還沒有燈</div>`}
       ${shown ? `<div class="sea-foot">
         <div class="grow">
@@ -434,11 +297,17 @@ function sealedCard(info) {
 const R2_X = 0.7548776662466927;   // 1/g
 const R2_Y = 0.5698402909980532;   // 1/g²
 
-export function scatter(items, opts = {}) {
+/**
+ * 算出每一盞的位置。
+ * 跟畫分開，是因為分享圖卡要用同一組座標——兩邊各算一次就會長不一樣。
+ */
+export function layoutOf(items, opts = {}) {
   const shown = items.slice(-SKY_RENDER_CAP);
 
   if (shown.length <= 2) {
-    return shown.map((it, i) => place(it, shown.length === 1 ? 50 : 36 + i * 28, 36)).join('');
+    return shown.map((it, i) => ({
+      it, x: shown.length === 1 ? 50 : 36 + i * 28, y: 36, glow: glowOf(it.joys), seed: 0,
+    }));
   }
 
   // 亮的燈最後畫，才會疊在上面。
@@ -457,9 +326,29 @@ export function scatter(items, opts = {}) {
       if (opts.avoidMoon) ({ x, y } = clearOfMoon(x, y, seed));
       return { it, x, y, glow: glowOf(it.joys), seed };
     })
-    .sort((a, b) => a.glow - b.glow)
-    .map(({ it, x, y, glow, seed }) => place(it, x, y, glow, seed))
-    .join('');
+    .sort((a, b) => a.glow - b.glow);
+}
+
+/** 算好的位置畫成 DOM。 */
+export function paint(spots) {
+  return spots.map(({ it, x, y, glow, seed }) => place(it, x, y, glow, seed)).join('');
+}
+
+/**
+ * 水裡的倒影。
+ *
+ * 不是照鏡子——真的照鏡子的話，天上那盞燈的倒影會落到畫面外。
+ * 水面的倒影是壓扁的（CSS 那邊 scaleY(-.45)），所以這裡照原位置畫，
+ * 壓扁交給容器。點不到，也不進無障礙樹。
+ */
+export function reflect(spots) {
+  return spots.map(({ it, x, y, glow, seed }) =>
+    `<span class="sea-lamp" style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;${windVars(seed)}">${renderSpark(it.lamp, { common: 7, uncommon: 9, rare: 12 }[it.lamp.tier] || 7, glow)}</span>`
+  ).join('');
+}
+
+export function scatter(items, opts = {}) {
+  return paint(layoutOf(items, opts));
 }
 
 /** 天空上的每一盞燈都可以點——不管是自己的還是別人的。 */
