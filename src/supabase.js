@@ -30,6 +30,7 @@ async function client() {
 }
 
 let sessionUser = null;
+let sessionPromise = null;
 
 /**
  * 匿名登入：不用 email、不用密碼，裝置上存一組 session。
@@ -43,9 +44,22 @@ let sessionUser = null;
  * 所以拿到 session 之後要跟伺服器確認一次；人不在就丟掉重新登入。
  */
 export async function ensureSession() {
+  if (sessionUser) return sessionUser;
+
+  // 同時進來的呼叫共用同一個登入。
+  // sessionUser 要等 await 回來才設定，所以沒有這道鎖的話，
+  // Promise.all 同時發兩個 RPC 會讓兩邊都看到 null、
+  // 兩邊都去 signInAnonymously()，生出兩個匿名身分——
+  // 其中一個立刻變成沒人認領的孤兒。
+  if (sessionPromise) return sessionPromise;
+
+  sessionPromise = openSession().finally(() => { sessionPromise = null; });
+  return sessionPromise;
+}
+
+async function openSession() {
   const sb = await client();
   if (!sb) return null;
-  if (sessionUser) return sessionUser;
 
   const { data: { session } } = await sb.auth.getSession();
 

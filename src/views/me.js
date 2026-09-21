@@ -2,6 +2,7 @@
 
 import * as S from '../store.js';
 import { esc, sheet, closeSheet, toast } from '../ui.js';
+import * as SB from '../supabase.js';
 import { isOnlineMode } from '../config.js';
 
 export function render(root, go) {
@@ -71,6 +72,31 @@ export function render(root, go) {
   root.querySelector('[data-import]').addEventListener('click', () => doImport(go));
 }
 
+/** 用備份檔裡的邀請碼把群組接回來。失敗不擋人，之後在同行分頁還能手動加。 */
+async function rejoinGroups() {
+  if (!isOnlineMode()) return;
+
+  const codes = S.myGroups()
+    .map((g) => ({ name: g.name, code: g.inviteCode }))
+    .filter((g) => g.code);
+  if (!codes.length) return;
+
+  await SB.syncProfile().catch(() => {});
+
+  const ok = [];
+  for (const g of codes) {
+    try {
+      await SB.joinGroup(g.code);
+      ok.push(g.name);
+    } catch (e) {
+      console.warn('[燈燈悅心] 重新加入失敗', g.name, e.message);
+    }
+  }
+
+  if (ok.length) toast(`接回了 ${ok.join('、')}`);
+  else toast('紀錄接回來了，但群組要再用邀請碼加一次');
+}
+
 function doExport() {
   const blob = new Blob([S.exportAll()], { type: 'application/json' });
   const a = document.createElement('a');
@@ -95,6 +121,12 @@ function doImport(go) {
         closeSheet();
         toast('匯入完成');
         go('me');
+        // 群組成員資格在伺服器上，綁的是匿名身分，不在備份檔裡。
+        // 新裝置是新身分，所以匯入完一定不在任何群裡——
+        // 畫面上會短暫看到群組，一進同行就被伺服器的空清單蓋掉，
+        // 而且之後供的燈會發進虛空（一個群都分享不到）。
+        // 備份檔裡每個群都帶著邀請碼，所以這裡直接拿去重新加入。
+        rejoinGroups();
       } catch (e) {
         toast(e.message || '這個檔案讀不進來');
       }
