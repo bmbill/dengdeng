@@ -187,6 +187,40 @@ export async function publishLamp(day, groupIds) {
   });
 }
 
+/**
+ * 補送「標記為公開、但其實沒送出去」的燈。
+ *
+ * 會有這種燈，是因為供燈時如果一個群都沒選到（例如換手機後還沒加入群），
+ * 發布那一步整個跳過——燈只留在本機。等她加回群，這些燈得補送，
+ * 不然群裡永遠看不到她那幾天。
+ *
+ * 只補沒有 remoteId 的，所以不會把老早就送過的整批重送；
+ * 也刻意不補「沒標記公開」的，加入新群不該把過去的私人紀錄倒進去。
+ *
+ * @returns 補送了幾盞
+ */
+export async function resendPublic({ limit = 90 } = {}) {
+  const groupIds = S.shareTargets();
+  if (!groupIds.length) return 0;
+
+  const pending = S.lamps()
+    .filter((d) => d.isPublic && !d.remoteId)
+    .slice(-limit)
+    .reverse();
+
+  let n = 0;
+  for (const day of pending) {
+    try {
+      // 一盞一盞來。並行只會讓失敗更難查，而且這是背景工作，不急。
+      const id = await publishLamp(day, groupIds);
+      if (id) { S.setRemoteId(id, day.date); n += 1; }
+    } catch (e) {
+      console.warn('[燈燈悅心] 補送失敗', day.date, e.message);
+    }
+  }
+  return n;
+}
+
 /** 取消某一天的公開。 */
 export async function unpublishLamp(day) {
   return publishLamp(day, []);

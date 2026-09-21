@@ -93,8 +93,11 @@ async function rejoinGroups() {
     }
   }
 
-  if (ok.length) toast(`接回了 ${ok.join('、')}`);
-  else toast('紀錄接回來了，但群組要再用邀請碼加一次');
+  if (!ok.length) return toast('紀錄接回來了，但群組要再用邀請碼加一次');
+
+  // 之前因為不在群裡而沒送出去的燈，現在補上
+  const n = await SB.resendPublic().catch(() => 0);
+  toast(n ? `接回了 ${ok.join('、')}，補送 ${n} 盞燈` : `接回了 ${ok.join('、')}`);
 }
 
 function doExport() {

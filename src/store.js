@@ -539,6 +539,12 @@ export function importAll(json) {
   const data = JSON.parse(json);
   if (!data || data.v !== 1) throw new Error('檔案格式不對');
   write(KEY_ME, data.me);
-  write(KEY_DAYS, data.days);
+
+  // remoteId 指向舊身分在伺服器上的燈。新裝置是新身分，那些 id
+  // 對它沒有意義：留著會讓「誰隨喜了我」去讀別人的燈，
+  // 也會讓補送判斷成「已經送過了」。一律清掉，重送就好。
+  const days = data.days || {};
+  for (const d of Object.values(days)) delete d.remoteId;
+  write(KEY_DAYS, days);
   return true;
 }
