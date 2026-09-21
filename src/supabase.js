@@ -70,6 +70,21 @@ async function openSession() {
       S.noteUserId(sessionUser.id);
       return sessionUser;
     }
+    // 只有伺服器明確說「這個 token 不算數」才丟掉。
+    //
+    // getUser() 失敗的原因不只一種：網路不通、GoTrue 那一下在忙
+    // （例如剛好有人在後台大量刪身分，auth.users 被鎖住）。
+    // 把那些也當成帳號沒了，裝置就會無聲無息換一個新的匿名身分，
+    // 跟自己所有的紀錄和群斷掉——比起暫時連不上，那個難修太多了。
+    // 分不出來的時候，寧可沿用本機這份。
+    const status = error?.status;
+    if (status !== 401 && status !== 403) {
+      console.warn('[燈燈悅心] 問不到伺服器，先沿用本機的登入', error?.message);
+      sessionUser = session.user;
+      S.noteUserId(sessionUser.id);
+      return sessionUser;
+    }
+
     console.warn('[燈燈悅心] 本機的登入資料已失效，重新登入');
     // scope local：伺服器那邊的帳號可能已經不在了，別再打過去
     await sb.auth.signOut({ scope: 'local' }).catch(() => {});
