@@ -15,9 +15,7 @@
 --   兩個都接了回去；這是猜錯的那個，沒人會再登入。
 --   身分 81bd9439——蔡宜臻的舊身分，那盞 09-19 已經被新身分重送了。
 --
--- 跑之前先確認 06-check.sql 裡 8412d77b 那一列的「已分享」
--- 等於「燈」。不等於就表示補送還沒成功，這時候刪掉 81bd9439
--- 會真的弄丟她 09-19 那一天。
+-- 補送有沒有跑成功，腳本自己會查（第 ④ 關），不必先去核對數字。
 --
 -- 整份在一個交易裡，中間任何一步失敗就全部回滾。
 
@@ -31,6 +29,7 @@ declare
   ];
   GROUP_KEEP uuid;
   n int;
+  n_lost text;
 begin
   -- ① 要保留的身分都還在嗎
   select count(*) into n from auth.users where id = any(KEEP);
@@ -54,7 +53,28 @@ begin
       n, array_length(KEEP, 1);
   end if;
 
-  -- ④ 動手。其他表都是 on delete cascade，刪 auth.users 就全帶走。
+  -- ④ 要刪的身分裡，有沒有哪一天只存在於它們底下？
+  --
+  -- 這是整份腳本唯一會真的弄丟東西的地方。刪掉 81bd9439 本來是安全的，
+  -- 前提是她那 3 天已經重新掛在新身分底下——補送要是沒跑成功，
+  -- 09-19 就只剩舊身分那一份，刪下去就沒了。
+  -- 與其請人去比對數字，不如讓腳本自己查：只看快樂學習裡的燈
+  -- （測試群整個會消失，那裡面的燈沒有保留的意義）。
+  select string_agg(distinct l.day::text, '、' order by l.day::text) into n_lost
+  from lamps l
+  join lamp_shares s on s.lamp_id = l.id
+  where s.group_id = GROUP_KEEP
+    and l.author_id <> all(KEEP)
+    and not exists (
+      select 1 from lamps k
+      join lamp_shares ks on ks.lamp_id = k.id
+      where ks.group_id = GROUP_KEEP and k.author_id = any(KEEP) and k.day = l.day
+    );
+  if n_lost is not null then
+    raise exception '這幾天只存在於要刪掉的身分底下：%。補送大概還沒跑成功，先別刪。', n_lost;
+  end if;
+
+  -- ⑤ 動手。其他表都是 on delete cascade，刪 auth.users 就全帶走。
   delete from auth.users where id <> all(KEEP);
   get diagnostics n = row_count;
   raise notice '清掉 % 個身分', n;
