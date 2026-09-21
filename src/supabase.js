@@ -67,6 +67,7 @@ async function openSession() {
     const { data, error } = await sb.auth.getUser();
     if (!error && data?.user) {
       sessionUser = data.user;
+      S.noteUserId(sessionUser.id);
       return sessionUser;
     }
     console.warn('[燈燈悅心] 本機的登入資料已失效，重新登入');
@@ -80,6 +81,9 @@ async function openSession() {
     return null;
   }
   sessionUser = data.user;
+  // 剛換了身分（帳號被刪、專案重建、從別台匯過來）的話，
+  // 本機那些 remoteId 就作廢了，不然補送會以為早就送過。
+  S.noteUserId(sessionUser.id);
   return sessionUser;
 }
 
@@ -219,6 +223,34 @@ export async function resendPublic({ limit = 90 } = {}) {
     }
   }
   return n;
+}
+
+/**
+ * 開 app 時對一次帳。
+ *
+ * 做兩件事：把群組清單抓下來，然後補送漏掉的燈。
+ *
+ * 之所以要放在啟動而不是只放在「匯入」和「加入群」之後，是因為
+ * 燈沒送出去的原因不只一種——供燈時剛好離線、伺服器那一下出錯、
+ * 或者被管理員直接加進群（本機從來沒經手過）。與其一個一個補，
+ * 不如每次開 app 都對一次；沒事的時候 pending 是空的，不花什麼。
+ *
+ * 一律安靜失敗：這是背景工作，沒連上就下次再說。
+ * @returns 補送了幾盞
+ */
+export async function catchUp() {
+  if (!isOnlineMode()) return 0;
+  try {
+    // 名字放在這裡同步，不放在加入群的時候——被管理員直接加進群的人
+    // 從來不會經過那條路，群裡就會看到一個「無名」。
+    await syncProfile();
+    const groups = await myGroups();
+    if (!groups || !groups.length) return 0;
+    return await resendPublic();
+  } catch (e) {
+    console.warn('[燈燈悅心] 開場對帳失敗', e.message);
+    return 0;
+  }
 }
 
 /** 取消某一天的公開。 */

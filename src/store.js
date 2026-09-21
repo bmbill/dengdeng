@@ -10,6 +10,7 @@ import { makeLamp, TIER_RANK } from './lamp.js';
 const KEY_DAYS = 'dd_days';
 const KEY_ME = 'dd_me';
 const KEY_QUEUE = 'dd_sync_queue';
+const KEY_UID = 'dd_uid';
 
 /* ── 日期 ── */
 
@@ -540,11 +541,41 @@ export function importAll(json) {
   if (!data || data.v !== 1) throw new Error('檔案格式不對');
   write(KEY_ME, data.me);
 
-  // remoteId 指向舊身分在伺服器上的燈。新裝置是新身分，那些 id
-  // 對它沒有意義：留著會讓「誰隨喜了我」去讀別人的燈，
-  // 也會讓補送判斷成「已經送過了」。一律清掉，重送就好。
   const days = data.days || {};
   for (const d of Object.values(days)) delete d.remoteId;
   write(KEY_DAYS, days);
+  return true;
+}
+
+/**
+ * remoteId 是「這盞燈在伺服器上的 id」，而伺服器上的燈掛在某個身分底下。
+ * 一換身分，那些 id 就不是你的了。留著會有兩個後果：補送時被當成
+ * 「已經送過」而跳過，以及「誰隨喜了我」跑去讀別人的燈。
+ * @returns 清掉幾個
+ */
+export function dropRemoteIds() {
+  const days = allDays();
+  let n = 0;
+  for (const d of Object.values(days)) if (d.remoteId) { delete d.remoteId; n += 1; }
+  if (n) write(KEY_DAYS, days);
+  return n;
+}
+
+/**
+ * 記住這台裝置現在用的是哪個身分。換了人就把 remoteId 全部作廢。
+ *
+ * 會換人的情況比想像中多：匯入別台的備份、伺服器上的帳號被刪掉、
+ * 整個專案重建。每一種都會讓本機那堆 remoteId 變成指向別人的燈，
+ * 而且症狀都一樣難查——燈明明標記公開，群裡就是看不到。
+ * 在這裡一次擋掉，比在每個呼叫點各自處理可靠。
+ */
+export function noteUserId(id) {
+  if (!id) return false;
+  const prev = read(KEY_UID, null);
+  if (prev === id) return false;
+  write(KEY_UID, id);
+  // 第一次登入沒有 prev，那不算換人（匯入時 importAll 已經清過了）
+  if (!prev) return false;
+  dropRemoteIds();
   return true;
 }
