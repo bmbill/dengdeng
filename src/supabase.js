@@ -31,6 +31,8 @@ async function client() {
 
 let sessionUser = null;
 let sessionPromise = null;
+// 這次開機有沒有換過身分。換了才允許自動用邀請碼接回群。
+let identityChanged = false;
 
 /**
  * 匿名登入：不用 email、不用密碼，裝置上存一組 session。
@@ -67,7 +69,7 @@ async function openSession() {
     const { data, error } = await sb.auth.getUser();
     if (!error && data?.user) {
       sessionUser = data.user;
-      S.noteUserId(sessionUser.id);
+      identityChanged = S.noteUserId(sessionUser.id) || identityChanged;
       return sessionUser;
     }
     // 只有伺服器明確說「這個 token 不算數」才丟掉。
@@ -81,7 +83,7 @@ async function openSession() {
     if (status !== 401 && status !== 403) {
       console.warn('[燈燈悅心] 問不到伺服器，先沿用本機的登入', error?.message);
       sessionUser = session.user;
-      S.noteUserId(sessionUser.id);
+      identityChanged = S.noteUserId(sessionUser.id) || identityChanged;
       return sessionUser;
     }
 
@@ -98,7 +100,7 @@ async function openSession() {
   sessionUser = data.user;
   // 剛換了身分（帳號被刪、專案重建、從別台匯過來）的話，
   // 本機那些 remoteId 就作廢了，不然補送會以為早就送過。
-  S.noteUserId(sessionUser.id);
+  identityChanged = S.noteUserId(sessionUser.id) || identityChanged;
   return sessionUser;
 }
 
@@ -136,6 +138,10 @@ export async function syncProfile() {
     id: user.id,
     display_name: me.name || '無名',
     avatar_char: me.avatarChar || '燈',
+    // 這個身分最後一次有人在用是什麼時候。
+    // 裝置換了身分之後，舊的那個從資料上看跟活著的沒兩樣，
+    // 要合併時就只能猜方向——猜錯會把人正在用的那台標記成退休。
+    last_seen: new Date().toISOString(),
   });
   if (error) console.warn('[燈燈悅心] profile 同步失敗', error.message);
   return user.id;
@@ -152,6 +158,12 @@ export async function syncProfile() {
  * @returns 有沒有接回任何一個
  */
 async function rejoinFromLocal() {
+  // 只有這台裝置的身分真的換過才自動接回。
+  // 少了這個條件，任何一台「本機還留著群和邀請碼」的裝置
+  // ——舊手機、另一個瀏覽器、測試用的視窗——一打開就會把自己
+  // 加進群裡，同一個人在群裡出現兩次。
+  if (!identityChanged) return false;
+
   const codes = S.myGroups().map((g) => g.inviteCode).filter(Boolean);
   if (!codes.length) return false;
 
