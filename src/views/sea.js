@@ -17,7 +17,9 @@ import { SKY_SIZE, SKY_RENDER_CAP, isOnlineMode } from '../config.js';
 
 /* 跨重繪保留的檢視狀態 */
 const view = {
-  mode: 'mine',   // 'mine' | 'group'
+  // 有群就先看大家的。一個人看自己的燈是回顧，看大家的才知道
+  // 今晚還有誰醒著——那是回來的理由。沒有群的時候自動退回「我的」。
+  mode: 'group',  // 'mine' | 'group'
   groupId: null,
   skyBack: 0,     // 0 = 現在這片天空，1 = 上一片，依此類推
 };
@@ -38,39 +40,64 @@ export function render(root, go) {
         <div class="sub" data-sub></div>
       </div>
     </header>
-    ${canGroup ? segmented(groups) : ''}
+    ${canGroup ? pill(groups) : ''}
     <div class="view" data-body></div>
   `;
 
-  root.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => {
-    view.mode = b.dataset.mode;
-    view.skyBack = 0;
-    render(root, go);
-  }));
-
-  root.querySelector('[data-group]')?.addEventListener('change', (e) => {
-    view.groupId = e.target.value;
-    view.skyBack = 0;
-    render(root, go);
-  });
+  root.querySelector('[data-pick]')?.addEventListener('click', () => openPicker(root, go, groups));
 
   if (view.mode === 'mine') renderMine(root, go);
   else renderGroup(root, go);
 }
 
-function segmented(groups) {
+/**
+ * 看哪一片，用一顆藥丸表示。
+ *
+ * 本來是「我的／大家的」兩格，再加一個下拉選群。兩層控制項擺在一起，
+ * 而且群一多下拉就變成一串看不完的名字。現在合成一顆：上面寫你正在看
+ * 哪一片，按下去列出全部——群再多也只是那張清單長一點。
+ */
+function pill(groups) {
+  const g = groups.find((x) => x.id === view.groupId);
+  const name = view.mode === 'mine' ? '我的燈海' : (g ? g.name : '大家的燈海');
   return `
-    <div style="padding:0 var(--gutter) 4px">
-      <div class="seg">
-        <button data-mode="mine" class="${view.mode === 'mine' ? 'on' : ''}">我的</button>
-        <button data-mode="group" class="${view.mode === 'group' ? 'on' : ''}">大家的</button>
-      </div>
-      ${view.mode === 'group' && groups.length > 1 ? `
-        <select class="field" data-group style="margin-top:10px;padding:10px 12px;font-size:.81rem">
-          ${groups.map((g) => `<option value="${esc(g.id)}" ${g.id === view.groupId ? 'selected' : ''}>${esc(g.name)} · ${g.memberCount} 人</option>`).join('')}
-        </select>` : ''}
+    <div style="padding:0 var(--gutter) 4px;display:flex;justify-content:center">
+      <button class="sky-pill" data-pick aria-haspopup="dialog">
+        <span>${esc(name)}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </div>
   `;
+}
+
+function openPicker(root, go, groups) {
+  const mine = S.lamps().length;
+
+  sheet(`
+    <h2>看哪一片燈海</h2>
+    <div class="stack" style="margin-top:14px;gap:8px">
+      <button class="pick-row ${view.mode === 'mine' ? 'on' : ''}" data-mine-sky>
+        <span class="grow">
+          <span class="n">我的燈海</span>
+          <span class="s">${mine} 盞 · 只有你看得到</span>
+        </span>
+      </button>
+      ${groups.map((g) => `
+        <button class="pick-row ${view.mode === 'group' && view.groupId === g.id ? 'on' : ''}" data-g="${esc(g.id)}">
+          <span class="grow">
+            <span class="n">${esc(g.name)}</span>
+            <span class="s">${g.memberCount} 人一起</span>
+          </span>
+        </button>`).join('')}
+    </div>
+  `, (el) => {
+    const pick = (fn) => { fn(); view.skyBack = 0; closeSheet(); render(root, go); };
+    el.querySelector('[data-mine-sky]').addEventListener('click', () => pick(() => { view.mode = 'mine'; }));
+    el.querySelectorAll('[data-g]').forEach((b) => b.addEventListener('click', () =>
+      pick(() => { view.mode = 'group'; view.groupId = b.dataset.g; })));
+  });
 }
 
 /* ══════════════════ 我的 ══════════════════ */
@@ -164,7 +191,7 @@ async function renderGroup(root, go) {
   const groupId = view.groupId;
   const group = S.myGroups().find((g) => g.id === groupId);
 
-  sub.textContent = group ? `${group.name} · ${group.memberCount} 人` : '大家的燈海';
+  sub.textContent = group ? `${group.memberCount} 人一起供的燈` : '大家的燈海';
   body.innerHTML = `<div class="empty">正在點亮這片天空…</div>`;
 
   const [lamps, info] = await Promise.all([

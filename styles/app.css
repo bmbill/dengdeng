@@ -453,17 +453,29 @@ button.sea-lamp:focus-visible { outline: 2px solid var(--night-ink); outline-off
   100% { transform: translate(20px, 370px); opacity: 0; }
 }
 
-.seg {
-  display: flex; gap: 4px; padding: 4px;
-  background: var(--paper-2); border-radius: var(--r-m);
+/* ── 看哪一片 ──
+   本來是「我的／大家的」兩格再加一個下拉選群。兩層控制項擺在一起，
+   群一多下拉就變成一串看不完的名字。現在合成一顆藥丸。 */
+.sky-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 42px; padding: 10px 18px; border: none;
+  border-radius: 21px; background: var(--card); box-shadow: var(--shadow);
+  font-family: var(--serif); font-size: .92rem; font-weight: 700;
+  letter-spacing: .04em; color: var(--ink); cursor: pointer;
 }
-.seg button {
-  flex-grow: 1; border: none; background: transparent;
-  padding: 9px; min-height: 44px; border-radius: 14px;
-  font-size: .81rem; font-weight: 500; color: var(--muted);
-  transition: background .2s ease, color .2s ease;
+.sky-pill:active { background: var(--paper-2); }
+.sky-pill svg { color: var(--muted); flex-shrink: 0; }
+
+.pick-row {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; text-align: left; min-height: 44px;
+  padding: 13px 15px; border: 1.5px solid transparent;
+  border-radius: var(--r-l); background: var(--card); box-shadow: var(--shadow);
+  cursor: pointer;
 }
-.seg button.on { background: var(--card); color: var(--cinnabar-d); box-shadow: 0 1px 4px rgba(120, 95, 60, .1); }
+.pick-row.on { border-color: var(--cinnabar); background: var(--paper-2); box-shadow: none; }
+.pick-row .n { display: block; font-size: .88rem; font-weight: 600; color: var(--ink); }
+.pick-row .s { display: block; margin-top: 2px; font-size: .72rem; color: var(--muted); }
 
 /* ── 我的／大家的 ── */
 
