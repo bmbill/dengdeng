@@ -1,7 +1,8 @@
-/* 我 —— 名字、統計、備份 */
+/* 我 —— 名字、統計、備份、換手機 */
 
 import * as S from '../store.js';
 import { esc, sheet, closeSheet, toast } from '../ui.js';
+import { copyText } from '../invite.js';
 import * as SB from '../supabase.js';
 import { isOnlineMode } from '../config.js';
 
@@ -55,6 +56,17 @@ export function render(root, go) {
         </div>
       </section>
 
+      ${isOnlineMode() ? `
+      <section class="card">
+        <div class="card-title">換手機</div>
+        <p class="small" style="margin-top:6px">
+          新手機第一次打開時輸入這組碼，燈和群就會接過去。
+          抄在紙上收好——它等於鑰匙，別人拿到就能接走你的紀錄。
+        </p>
+        <div data-code-slot></div>
+        <button class="btn ghost btn-full" style="margin-top:12px" data-show-code>顯示接回碼</button>
+      </section>` : ''}
+
       <div class="small center" style="padding:6px 10px 20px">
         燈燈悅心 · ${t.lamps} 盞燈 · ${t.entries} 則${t.pages ? ` · ${t.pages} 頁經` : ''}
       </div>
@@ -70,6 +82,33 @@ export function render(root, go) {
 
   root.querySelector('[data-export]').addEventListener('click', doExport);
   root.querySelector('[data-import]').addEventListener('click', () => doImport(go));
+  root.querySelector('[data-show-code]')?.addEventListener('click', showCode);
+}
+
+/** 顯示接回碼。要按了才去拿——沒人用到的話，伺服器上就不會有這組碼。 */
+async function showCode(e) {
+  const btn = e.currentTarget;
+  const slot = btn.parentElement.querySelector('[data-code-slot]');
+  btn.disabled = true;
+  btn.textContent = '正在拿…';
+  try {
+    const code = await SB.myRecoveryCode();
+    // 四碼一組，用看的和用抄的都比較不會錯行
+    const pretty = String(code).replace(/(.{4})(?=.)/g, '$1-');
+    slot.innerHTML = `
+      <div class="field center serif" style="margin-top:12px;letter-spacing:.18em;font-size:1.25rem">
+        ${esc(pretty)}
+      </div>
+      <button class="btn ghost btn-full" style="margin-top:10px" data-copy>複製</button>`;
+    btn.remove();
+    slot.querySelector('[data-copy]').addEventListener('click', async () => {
+      toast(await copyText(code) ? '接回碼複製好了' : '複製失敗，手動抄一下');
+    });
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = '顯示接回碼';
+    toast(err.message || '拿不到接回碼，等一下再試');
+  }
 }
 
 /** 用備份檔裡的邀請碼把群組接回來。失敗不擋人，之後在同行分頁還能手動加。 */

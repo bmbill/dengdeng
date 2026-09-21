@@ -323,6 +323,47 @@ export async function unpublishLamp(day) {
   return publishLamp(day, []);
 }
 
+/* ── 換手機 ── */
+
+/**
+ * 我的接回碼。伺服器第一次被問到的時候才生成，沒人用到就不存在。
+ */
+export async function myRecoveryCode() {
+  await syncProfile();
+  return rpc('my_recovery_code', {});
+}
+
+/**
+ * 用接回碼把舊身分名下的東西接到現在這個身分底下。
+ *
+ * 不是「用舊帳號登入」——匿名 session 的 token 只在原本那台裝置上，
+ * 伺服器沒辦法再發一次。所以是反過來搬。
+ */
+export async function reclaimIdentity(code) {
+  // 先建 profile：接回那一步要往新身分的 profile 寫名字和碼
+  await syncProfile();
+  const rows = await rpc('reclaim_identity', { code });
+  const r = Array.isArray(rows) ? rows[0] : rows;
+  if (!r) throw new Error('接不回來');
+  return { name: r.name, lamps: Number(r.lamps || 0), groups: Number(r.groups || 0) };
+}
+
+/**
+ * 把伺服器上自己的燈抓回本機。
+ * 只有公開過的那幾則——沒公開的從來沒離開過原本那台裝置，
+ * 那些只能靠備份檔。
+ * @returns 補回幾天
+ */
+export async function pullMyLamps() {
+  const rows = await rpc('my_lamps', {}, { silent: true });
+  if (!rows) return 0;
+  return S.hydrateDays(rows.map((r) => ({
+    date: r.day,
+    lamp: r.lamp,
+    entries: r.entries || [],
+  })));
+}
+
 /* ── 共同燈海 ── */
 
 /**

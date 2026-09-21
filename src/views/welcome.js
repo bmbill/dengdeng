@@ -51,6 +51,11 @@ export function render(root, done, invite = null) {
             朋友給了我邀請碼
           </button>` : ''}
 
+        ${isOnlineMode() ? `
+          <button class="btn ghost btn-full" style="margin-top:10px" data-restore>
+            我換過手機了
+          </button>` : ''}
+
         <button class="welcome-skip" data-skip>之後再說</button>
       </div>
     </div>
@@ -68,6 +73,7 @@ export function render(root, done, invite = null) {
   goBtn.addEventListener('click', submit);
   root.querySelector('[data-skip]').addEventListener('click', () => finish('', done));
   root.querySelector('[data-code]')?.addEventListener('click', () => openCode(input, done));
+  root.querySelector('[data-restore]')?.addEventListener('click', () => openRestore(done));
 
   // 手機上自動彈鍵盤會把版面推掉，讓使用者自己點。
   if (window.matchMedia('(min-width: 600px)').matches) input.focus();
@@ -101,6 +107,52 @@ function finish(name, done) {
     SB.syncProfile().catch(() => {});
   }
   done();
+}
+
+/**
+ * 換手機：用接回碼把舊身分名下的東西接過來。
+ *
+ * 不問名字——名字連同燈和群一起接回來，再問一次只是多一道手續。
+ */
+function openRestore(done) {
+  sheet(`
+    <h2>接回舊手機的紀錄</h2>
+    <p class="small" style="margin-top:6px">
+      在舊手機的「我」分頁最下面，按「顯示接回碼」就看得到那 12 碼。
+    </p>
+    <input class="field" style="margin-top:14px;letter-spacing:.14em;text-align:center;font-size:1.1rem"
+           maxlength="16" placeholder="K7M2-P4XQ-9RTN" aria-label="接回碼" data-code>
+    <button class="btn btn-full" style="margin-top:16px" data-go>接回來</button>
+    <p class="small" style="margin-top:12px">
+      沒公開過的那幾則接不回來——它們從來沒離開過舊手機，那些要用備份檔。
+    </p>
+  `, (el) => {
+    const codeInput = el.querySelector('[data-code]');
+    const btn = el.querySelector('[data-go]');
+    codeInput.focus();
+
+    btn.addEventListener('click', async () => {
+      const code = codeInput.value.trim();
+      if (!code) return toast('貼上接回碼');
+
+      btn.disabled = true;
+      btn.textContent = '正在接…';
+      try {
+        const r = await SB.reclaimIdentity(code);
+        S.setMe({ name: r.name });
+        // 伺服器上有的燈拉回本機，不然新手機的「我的燈海」會是空的
+        const n = await SB.pullMyLamps();
+        await SB.myGroups();
+        closeSheet();
+        toast(`接回來了，${n} 盞燈、${r.groups} 個群`);
+        done();
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = '接回來';
+        toast(e.message || '接不回來');
+      }
+    });
+  });
 }
 
 /** 手動輸入邀請碼。先存名字再加入，不然對方看到的會是「無名」。 */

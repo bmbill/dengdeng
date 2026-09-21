@@ -359,6 +359,8 @@ src/
     lampcard.js          點開一盞燈的小卡（日期當標題）
 supabase/
   schema.sql             建表 + RLS + RPC
+  add-*.sql              後來加的，只有函式，可以在 app 活著的時候跑
+  0*.sql                 一次性的維護腳本，跑過就不用再跑
 demo-sky.html            自己打開就能看的天空預覽
 design-mockup/           設計稿原始檔，不影響執行
 ```

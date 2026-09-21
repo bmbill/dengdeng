@@ -548,6 +548,39 @@ export function importAll(json) {
 }
 
 /**
+ * 用伺服器上的燈把本機補回來。換手機接回身分之後用。
+ *
+ * 只補本機沒有的那幾天。本機那一份永遠比較完整——它還留著沒公開的幾則，
+ * 那些從來沒上過伺服器，蓋掉就真的沒了。
+ * @returns 補回幾天
+ */
+export function hydrateDays(rows) {
+  const days = allDays();
+  let n = 0;
+  for (const r of rows) {
+    if (!r.date || days[r.date]) continue;
+    const day = emptyDay(r.date);
+    // 伺服器不存每一則是什麼時候寫的，補一個當天的時間就好——
+    // 顯示上只用到日期，這個欄位是給排序用的。
+    const at = `${r.date}T12:00:00.000Z`;
+    day.entries = (r.entries || []).map((e) => ({
+      id: crypto.randomUUID(),
+      kind: KINDS[e.kind] ? e.kind : 'deed',
+      text: e.text || '',
+      ...(e.pages ? { pages: e.pages } : {}),
+      at,
+    }));
+    day.lamp = r.lamp || null;
+    day.sealedAt = at;
+    day.isPublic = true;
+    days[r.date] = day;
+    n += 1;
+  }
+  if (n) write(KEY_DAYS, days);
+  return n;
+}
+
+/**
  * remoteId 是「這盞燈在伺服器上的 id」，而伺服器上的燈掛在某個身分底下。
  * 一換身分，那些 id 就不是你的了。留著會有兩個後果：補送時被當成
  * 「已經送過」而跳過，以及「誰隨喜了我」跑去讀別人的燈。
