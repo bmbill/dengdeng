@@ -1,12 +1,14 @@
 -- 燈燈悅心 — 把蔡宜臻的兩個身分併成一個
 --
--- 8412d77b（3 天，有隨喜和留言）和 fe124aa9（只有 09-19，
--- 是 resendPublic() 補送到一半被關掉留下的）。
+-- 她同一支手機上有兩份：Safari 和「加入主畫面」的那個。
+-- iOS 上這兩者的儲存空間是分開的，所以各自登了一個匿名身分——
+-- 9/21 16:22 憑空多出來的第三個成員就是這樣來的。
 --
--- 方向不用猜：留 last_seen 比較新的那個，也就是她手機真的還在用的那個。
--- 這件事以前伺服器答不出來，所以前兩次合併都是憑推理決定方向；
--- 猜錯會把人正在用的裝置標記成退休，然後她就完全動不了。
--- 所以 last_seen 是空的就直接中止，請她先開一次 app。
+--   8412d77b  加入主畫面的那個，3 天，有隨喜和留言 ← 她要用這個
+--   fe124aa9  瀏覽器那個，只有 09-19，是補送到一半被關掉留下的
+--
+-- 方向是照她本人講的，不是用 last_seen 推的：她兩邊都開過，
+-- 推出來的答案反而可能是最後手滑打開的那個。last_seen 只印出來對照。
 --
 -- 全程不碰 auth.users。delete from auth.users 會鎖住 auth 表，
 -- 而那正是這兩天連續兩次把人踢成新身分的原因。
@@ -16,26 +18,14 @@ begin;
 
 do $$
 declare
-  A uuid := '8412d77b-b354-41a8-8edc-21bc98c87956';
-  B uuid := 'fe124aa9-10ca-47ad-ad19-7dd6ba06abc9';
-  live uuid;
-  dead uuid;
-  sa timestamptz;
-  sb timestamptz;
+  live uuid := '8412d77b-b354-41a8-8edc-21bc98c87956';  -- 加入主畫面的，留這個
+  dead uuid := 'fe124aa9-10ca-47ad-ad19-7dd6ba06abc9';  -- 瀏覽器那個，退場
   n int;
 begin
-  select last_seen into sa from profiles where id = A;
-  select last_seen into sb from profiles where id = B;
-
-  if sa is null and sb is null then
-    raise exception '兩個身分都還沒有 last_seen。先跑 add-last-seen.sql、等 v36 上線，請她開一次 app 再來。';
+  if not exists (select 1 from profiles where id = live) then
+    raise exception '找不到要保留的身分。中止。';
   end if;
 
-  if coalesce(sa, 'epoch'::timestamptz) >= coalesce(sb, 'epoch'::timestamptz)
-    then live := A; dead := B;
-    else live := B; dead := A;
-  end if;
-  raise notice '留 %，退場 %', live, dead;
 
   -- 撞到同一天的，留「被回應比較多」的那一份。
   -- 內容兩邊一樣，差別只在隨喜和留言掛在哪一盞上——那些是別人給的，
