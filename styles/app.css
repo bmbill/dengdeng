@@ -411,8 +411,29 @@ button.sea-lamp:focus-visible { outline: 2px solid var(--night-ink); outline-off
 .tag.info { color: var(--azurite-d); background: var(--azurite-bg); }
 
 /* ── 一盞燈的小卡 ──
-   重點是善行，燈只是註腳，所以留白收緊、字級拉近內文。 */
+   日期是標題，燈是那一天的樣子，善行一則一張白卡。
+   燈的規格（形制／焰色／燈身色）不在這裡講，那是開獎那頁的事。 */
 .sheet.compact { padding: 18px var(--gutter) calc(18px + env(safe-area-inset-bottom, 10px)); }
+
+.card-lamp {
+  width: 168px; height: 168px; margin: 0 auto;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 46%, #FBEBC8 0%, var(--paper) 68%);
+  display: flex; align-items: center; justify-content: center;
+}
+.card-date {
+  font-family: var(--serif); font-size: 1.3rem; font-weight: 700;
+  letter-spacing: .06em; color: var(--ink);
+}
+
+/* 善行一則一張。白卡浮在宣紙上，內容才跳得出來。 */
+.deed {
+  background: var(--card);
+  border-radius: var(--r-l);
+  padding: 15px 17px;
+  box-shadow: var(--shadow);
+}
+.deed + .deed { margin-top: 9px; }
 
 .card-x {
   width: 34px; height: 34px; min-height: 34px;
@@ -437,11 +458,6 @@ button.sea-lamp:focus-visible { outline: 2px solid var(--night-ink); outline-off
   display: flex; flex-direction: column; gap: 8px;
 }
 
-.card-foot {
-  margin-top: 16px; padding-top: 12px;
-  border-top: 1px solid var(--line);
-  display: flex; align-items: center; gap: 8px;
-}
 
 /* ── 語錄卡 ── */
 .quote { font-family: var(--serif); font-size: 1.12rem; font-weight: 600; line-height: 1.9; letter-spacing: .05em; }

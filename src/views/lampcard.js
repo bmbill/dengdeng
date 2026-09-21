@@ -1,27 +1,39 @@
 /* 一盞燈的小卡
  *
- * 重點是那件善行，不是燈。
+ * 標題是那一天，不是那盞燈。
  *
- * 之前這張卡把燈畫得很大、稀有度和焰色用大標籤標出來，
- * 善行反而縮在下面——那個比重是反的。有人做了一件好事，
- * 標題不該是「少見 · 藤黃焰」。
+ * 排過兩次。第一版把燈畫得很大、稀有度和焰色用大標籤標出來，
+ * 善行縮在下面——有人做了一件好事，標題不該是「少見 · 藤黃焰」。
+ * 第二版反過來，內容擺第一、燈縮成一個小圖示，但整張卡變得
+ * 沒有重心，看起來就是一段文字。
  *
- * 現在：內容擺第一，燈縮成一個小圖示，形制焰色收成一行灰字。
+ * 現在是第三版：日期當標題，燈在標題上面（它就是那一天的樣子），
+ * 善行一則一張白卡排在下面。規格不講了——形制、焰色、燈身色是
+ * 開獎那一刻的事，之後再看只想知道那天是誰、做了什麼。
  */
 
 import * as S from '../store.js';
 import * as SB from '../supabase.js';
 import { esc, sheet, closeSheet, toast } from '../ui.js';
-import { renderLamp, TIER_LABEL, GILT_LABEL, BOWLS, FLAMES } from '../lamp.js';
+import { renderLamp } from '../lamp.js';
 
-/** 燈的細節，一行灰字就好。 */
-function lampFootnote(l) {
-  const bits = [l.name, TIER_LABEL[l.tier], GILT_LABEL[l.tier], FLAMES[l.flame]?.name, BOWLS[l.bowl]?.name]
-    .filter(Boolean);
+/**
+ * 卡頭：燈、日期、一行「誰的什麼燈」。
+ *
+ * 日期用襯線大字當標題——翻回去看舊的燈海時，先想知道的是
+ * 「那是哪一天」，不是「那是第幾種形制」。
+ */
+function head(lamp, date, who) {
   return `
-    <div class="card-foot">
-      <span style="flex-shrink:0">${renderLamp(l, { size: 22 })}</span>
-      <span class="tiny">${esc(bits.join(' · '))}</span>
+    <div class="row" style="justify-content:flex-end">
+      <button class="card-x" data-x aria-label="關閉">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6.4 6.4l11.2 11.2M17.6 6.4L6.4 17.6" stroke="#8A8073" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div style="text-align:center">
+      <div class="card-lamp">${renderLamp(lamp, { size: 118 })}</div>
+      <div class="card-date">${esc(S.prettyDate(date))}</div>
+      <div class="tiny" style="margin-top:7px">${esc(who)}</div>
     </div>
   `;
 }
@@ -29,24 +41,9 @@ function lampFootnote(l) {
 function entryBlock(e) {
   const label = S.KINDS[e.kind]?.name || '紀錄';
   return `
-    <div class="entry">
+    <div class="deed">
       <div class="entry-kind">${esc(label)}${e.pages ? ` · ${e.pages} 頁` : ''}</div>
       <div class="entry-text">${esc(e.text)}</div>
-    </div>
-  `;
-}
-
-function header(title, sub, char) {
-  return `
-    <div class="row" style="gap:10px;align-items:flex-start">
-      ${char ? `<span class="avatar" style="width:32px;height:32px;border-radius:16px;font-size:.84rem;flex-shrink:0">${esc(char)}</span>` : ''}
-      <span class="grow" style="min-width:0">
-        <span style="display:block;font-size:.88rem;font-weight:600">${esc(title)}</span>
-        <span class="tiny" style="display:block;margin-top:2px">${esc(sub)}</span>
-      </span>
-      <button class="card-x" data-x aria-label="關閉">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6.4 6.4l11.2 11.2M17.6 6.4L6.4 17.6" stroke="#8A8073" stroke-width="2" stroke-linecap="round"/></svg>
-      </button>
     </div>
   `;
 }
@@ -59,20 +56,19 @@ export function showMyDay(date) {
   const joys = (day.joys || []).length;
 
   sheet(`
-    ${header('那天你寫了', S.prettyDate(date), null)}
+    ${head(day.lamp, date, `你的${day.lamp.name}`)}
 
-    <div class="stack" style="margin-top:14px;gap:12px">
+    <div style="margin-top:16px">
       ${(day.entries || []).length
         ? day.entries.map(entryBlock).join('')
-        : '<div class="small">這天沒有寫，只有一盞燈。</div>'}
-      ${joys ? `<div class="entry">
+        : '<div class="small center">這天沒有寫，只有一盞燈。</div>'}
+      ${joys ? `<div class="deed">
         <div class="entry-kind">隨喜</div>
         <div class="entry-text">你隨喜了 ${joys} 盞別人的燈</div>
       </div>` : ''}
     </div>
 
     <div data-echo></div>
-    ${lampFootnote(day.lamp)}
   `, (el) => {
     el.querySelector('[data-x]').addEventListener('click', closeSheet);
     if (day.remoteId) loadEcho(el.querySelector('[data-echo]'), day.remoteId);
@@ -106,12 +102,12 @@ export async function showSharedLamp(lampId, onChange) {
   const mine = d.authorId === (await SB.myUserId());
 
   sheet(`
-    ${header(d.authorName + (mine ? '（你）' : ''), S.prettyDate(d.date), d.authorChar)}
+    ${head(d.lamp, d.date, `${d.authorName}${mine ? '（你）' : ''} 的${d.lamp.name}`)}
 
-    <div class="stack" style="margin-top:14px;gap:12px">
+    <div style="margin-top:16px">
       ${d.entries.length
         ? d.entries.map(entryBlock).join('')
-        : '<div class="small">這天沒有公開內容，只有一盞燈。</div>'}
+        : '<div class="small center">這天沒有公開內容，只有一盞燈。</div>'}
     </div>
 
     ${d.replies.length ? `<div class="echo">
@@ -126,8 +122,6 @@ export async function showSharedLamp(lampId, onChange) {
            </button>
            <button class="btn chip" data-reply>留言</button>`}
     </div>
-
-    ${lampFootnote(d.lamp)}
   `, (el) => {
     el.querySelector('[data-x]').addEventListener('click', closeSheet);
     el.querySelector('[data-joy]')?.addEventListener('click', (e) => onJoy(e.currentTarget, d, onChange));
