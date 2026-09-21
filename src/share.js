@@ -1,13 +1,18 @@
 /* 分享圖卡
  *
- * 原本只送一段純文字，貼到 LINE 就是一坨字。
- * 圖卡的重點跟小卡一樣：**善行是主角**，燈是陪襯。
+ * 兩種：
+ *   一天的燈   —— 重點跟小卡一樣，善行是主角，燈是陪襯
+ *   一片天空   —— 整群的，尤其是滿了那一刻
  *
  * 全部用 canvas 畫，不依賴任何外部服務——不用把你的紀錄
  * 送去別人的伺服器產圖。
+ *
+ * 景是 SVG 轉點陣後貼上去的，字一律用 canvas 寫：SVG 當成圖片載入時
+ * 拿不到頁面的字型，整張卡的味道就沒了。
  */
 
 import { renderLampFlat } from './lamp.js';
+import { skySVG } from './sky.js';
 import * as S from './store.js';
 
 const W = 1080;
@@ -158,6 +163,97 @@ export async function makeShareCard(day) {
   });
 }
 
+/* ══════════════════ 一片天空 ══════════════════ */
+
+/**
+ * 整片共同燈海畫成一張圖。
+ *
+ * 位置、景、鎏金都跟畫面上那一片同一組座標（都來自 sky.js），
+ * 所以分享出去的跟大家看到的是同一片天空，不是另外畫一張像的。
+ *
+ * 會動的東西挑一個瞬間定住：人剛好走進畫面、塔燈亮著。
+ * 省略不畫的話，分享出去的天空會比真的那片空。
+ */
+export async function makeSkyCard({ info, spots, reached, groupName }) {
+  try { await document.fonts.ready; } catch { /* 不支援就算了 */ }
+
+  // 天空留 1010，底下 340 給字。字帶再窄一點，日期就會壓到落款上。
+  const skyH = 1010;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#0E1620';
+  ctx.fillRect(0, 0, W, H);
+
+  const scene = skySVG({
+    layout: spots.map((p) => ({ x: p.x, y: p.y, glow: p.glow, lamp: p.it.lamp })),
+    filled: info.filled,
+    reached,
+    skyNo: info.skyNo,
+    height: skyH,
+  });
+  const img = await svgToImage(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${skyH}" viewBox="0 0 ${W} ${skyH}">${scene}</svg>`);
+  ctx.drawImage(img, 0, 0, W, skyH);
+
+  // 天空與字帶之間收一道，不然接縫是一條線
+  const seam = ctx.createLinearGradient(0, skyH - 120, 0, skyH);
+  seam.addColorStop(0, 'rgba(14, 22, 32, 0)');
+  seam.addColorStop(1, '#0E1620');
+  ctx.fillStyle = seam;
+  ctx.fillRect(0, skyH - 120, W, 120);
+
+  ctx.textAlign = 'center';
+  const cx = W / 2;
+  let y = skyH + 78;
+
+  ctx.fillStyle = '#F2E6CC';
+  ctx.font = '700 56px "Noto Serif TC", serif';
+  ctx.fillText(groupName || '大家的燈海', cx, y);
+  y += 58;
+
+  ctx.fillStyle = '#F2C877';
+  ctx.font = '400 34px "Noto Sans TC", sans-serif';
+  ctx.fillText(
+    `第 ${info.skyNo} 片天空 · ${info.isFull ? `滿了 ${info.filled} 盞` : `${info.filled} / ${info.size} 盞`}`,
+    cx, y
+  );
+  y += 46;
+
+  ctx.fillStyle = '#A9B5BF';
+  ctx.font = '400 29px "Noto Sans TC", sans-serif';
+  ctx.fillText(
+    `${info.authors} 個人 · ${info.entries} 則紀錄${info.pages ? ` · ${info.pages} 頁經` : ''}`,
+    cx, y
+  );
+  y += 42;
+  ctx.fillText(skyRange(info), cx, y);
+
+  ctx.fillStyle = '#6E7C8A';
+  ctx.font = '600 28px "Noto Serif TC", serif';
+  ctx.fillText('燈燈悅心', cx, H - 46);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('畫不出來'))), 'image/png');
+  });
+}
+
+/** 這片天空涵蓋哪幾天。 */
+function skyRange(info) {
+  if (!info.fromDay) return '';
+  const a = S.prettyDate(info.fromDay).split(' ·')[0];
+  if (info.fromDay === info.toDay) return a;
+  return `${a} – ${S.prettyDate(info.toDay).split(' ·')[0]}`;
+}
+
+export async function shareSky(ctx) {
+  const blob = await makeSkyCard(ctx);
+  return send(blob, `燈燈悅心-第${ctx.info.skyNo}片天空.png`);
+}
+
+/* ══════════════════ 送出去 ══════════════════ */
+
 /**
  * 分享出去。
  * 手機上直接跳出 LINE 那排；不支援分享檔案的就存成圖片。
@@ -165,7 +261,11 @@ export async function makeShareCard(day) {
  */
 export async function shareCard(day) {
   const blob = await makeShareCard(day);
-  const file = new File([blob], `燈燈悅心-${day.date}.png`, { type: 'image/png' });
+  return send(blob, `燈燈悅心-${day.date}.png`);
+}
+
+async function send(blob, name) {
+  const file = new File([blob], name, { type: 'image/png' });
 
   if (navigator.canShare?.({ files: [file] })) {
     try {
@@ -180,7 +280,7 @@ export async function shareCard(day) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = file.name;
+  a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   return 'saved';

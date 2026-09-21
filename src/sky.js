@@ -1,6 +1,7 @@
 /* 夜空 —— 場景、會長出來的東西、以及畫成圖卡的那一版
  *
- * 這裡是「天空長什麼樣」的單一來源，畫面上的天空從這支出去。
+ * 這裡是「天空長什麼樣」的單一來源。畫面上的天空（DOM＋CSS 動畫）
+ * 和分享圖卡（一張靜止的 SVG）都從這支出去，不然兩邊會愈長愈不像。
  *
  * 景分兩層長：
  *
@@ -14,6 +15,8 @@
  * 底色則是第幾片天空決定的（三種循環），真實的節氣與時辰再疊一層：
  * 冬天飄雪、清晨天色轉淡。月相本來就跟外面同步，這是往下接同一件事。
  */
+
+import { FLAMES, GILT } from './lamp.js';
 
 /* ── 場景 ──
  * 每一片天空換一種底。不用設定、不用改資料庫，而且「下一片是什麼」
@@ -284,4 +287,215 @@ function reeds() {
     <path class="grass-far" d="${grassPath(40, 24, 0)}"/>
     <path class="grass-near" d="${grassPath(26, 37, 4)}"/>
   </svg>`;
+}
+
+/* ══════════════════ 畫成圖卡 ══════════════════
+ *
+ * 圖卡是一張靜止的 SVG：沒有動畫，所以會動的那些（風、走過的人、
+ * 閃的塔燈）要挑一個好看的瞬間定住，不是省略。 */
+
+const SKY_W = 1080;
+
+/** 場景的底色。時辰會調，冬天會再冷一點。 */
+function skyPaint(scene, amb) {
+  const base = {
+    night:  ['#1E2A38', '#16202C'],
+    lake:   ['#1B2740', '#101A2C'],
+    valley: ['#212C3A', '#141E29'],
+  }[scene] || ['#1E2A38', '#16202C'];
+
+  if (amb.tod === 'dawn') return ['#2B3A4E', '#3C4A55'];
+  if (amb.tod === 'dusk') return ['#2A2C3C', '#3B3040'];
+  return base;
+}
+
+/**
+ * 整片天空畫成一張 SVG。
+ *
+ * @param {{
+ *   items: Array<{lamp:object, joys?:number, key:string}>,
+ *   filled:number, reached:number, skyNo:number,
+ *   layout: Array<{x:number,y:number,glow:number,lamp:object}>,
+ *   height:number, now?:Date
+ * }} o
+ */
+export function skySVG(o) {
+  const { layout = [], filled = 0, reached = filled, skyNo = 1, height = 1080, now = new Date() } = o;
+  const scene = sceneOf(skyNo).key;
+  const amb = ambience(now);
+  const [c1, c2] = skyPaint(scene, amb);
+
+  const W = SKY_W;
+  const H = height;
+  const px = (p) => (p / 100) * W;          // x 是百分比
+  const py = (p) => (p / 100) * H;          // y 也是百分比
+  const k = W / 360;                        // DOM 是 ~360 寬，這裡放大
+
+  // 地平線：畫面上是「底部那塊漸層的上緣」，比照搬過來。
+  const horizon = H - 94 * (H / 352);
+  const water = horizon + 6;
+
+  const parts = [];
+
+  // ── 底 ──
+  parts.push(`<defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/>
+    </linearGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${c2}" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0E1620" stop-opacity=".85"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2A3C5C" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#0E1828" stop-opacity=".98"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="reflect" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}">
+      <rect x="0" y="${water}" width="${W}" height="${H - water}" fill="url(#fade)"/>
+    </mask>
+  </defs>`);
+  parts.push(`<rect width="${W}" height="${H}" fill="url(#sky)"/>`);
+
+  // ── 星 ──
+  if (reached >= 1080) {
+    parts.push([...Array(46)].map((_, i) => {
+      const x = px(6 + 88 * ((i * 0.7548776662) % 1));
+      const y = py(4 + 58 * ((i * 0.5698402909) % 1));
+      const r = (0.9 + (i % 3) * 0.6) * k;
+      return `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r.toFixed(1)}" fill="#E8E2D2" opacity="${(0.4 + (i % 4) * 0.15).toFixed(2)}"/>`;
+    }).join(''));
+  }
+
+  // ── 月 ──
+  const moonBox = 36 * k;
+  if (filled >= 108) {
+    parts.push(`<g transform="translate(${px(12)} ${py(12)}) scale(${(moonBox / 40).toFixed(3)})">${moonArt(now)}</g>`);
+  }
+
+  // ── 雁 ──
+  if (reached >= 540) {
+    parts.push(`<g fill="none" stroke="#5A6E85" stroke-width="${(1.6 * k).toFixed(1)}" stroke-linecap="round" opacity=".8">`
+      + GEESE.map((g) => `<g transform="translate(${px(62) + g.x * k * 1.6} ${py(20) + g.y * k * 1.6}) scale(${(g.s * k * 1.5).toFixed(2)})"><path d="${GOOSE_ART}"/></g>`).join('')
+      + `</g>`);
+  }
+
+  // ── 遠山（山谷才有）──
+  if (scene === 'valley') {
+    const top = horizon - 86 * k;
+    parts.push(`<g transform="translate(0 ${top}) scale(${(W / 320).toFixed(3)} ${((86 * k) / 40).toFixed(3)})">
+      <path d="${RANGE_FAR}" fill="#26364A"/>
+      <path d="${RANGE_NEAR}" fill="#1C2A3A"/>
+    </g>`);
+  }
+
+  // 地平線那層暗漸層。順序很重要：它要在倒影「之前」畫——
+  // 畫在後面會把整片倒影蓋掉，水裡就只剩一塊黑。
+  // 湖面那一景不需要它，水自己就夠暗了。
+  if (scene !== 'lake') {
+    parts.push(`<rect x="0" y="${horizon - 6}" width="${W}" height="${H - horizon + 6}" fill="url(#ground)"/>`);
+  }
+
+  // ── 水（湖面才有）──
+  if (scene === 'lake') {
+    parts.push(`<rect x="0" y="${water}" width="${W}" height="${H - water}" fill="url(#water)"/>`);
+    // 月光在水面拉出一道
+    if (filled >= 108) {
+      parts.push(`<rect x="${px(12) + moonBox / 2 - 9 * k}" y="${water}" width="${18 * k}" height="${H - water}"
+        fill="#E8E2D2" opacity=".07"/>`);
+    }
+  }
+
+  // ── 塔 ──
+  if (filled >= 49) {
+    const pw = 52 * k;
+    const ph = 74 * k;
+    parts.push(`<g transform="translate(${W - px(9) - pw} ${horizon - 6 * k - ph}) scale(${(pw / 80).toFixed(3)} ${(ph / 96).toFixed(3)})"
+      fill="#33455A">${PAGODA_ART}
+      <rect x="35" y="69" width="10" height="11" rx="1.4" fill="#E8B45A" opacity=".9"/>
+    </g>`);
+  }
+
+  // ── 燈與倒影 ──
+  //
+  // 倒影壓成 0.4 倍，不是照鏡子：照鏡子的話，天上那盞的倒影會落到
+  // 水面底下更深的地方，整個掉出畫面。壓過之後全部收在水裡。
+  const sparks = layout.map((p, i) => sparkSVG(p, i, px, py, k)).join('');
+  if (scene === 'lake') {
+    // 遮罩要掛在外層那個「沒有 transform」的 g 上。掛在同一個 g 上的話，
+    // 遮罩會跟著一起翻過去——遮到的就變成天空，水面反而全被擦掉。
+    parts.push(`<g mask="url(#reflect)"><g opacity=".6" transform="translate(0 ${water}) scale(1 -0.4) translate(0 ${-water})">${sparks}</g></g>`);
+  }
+  parts.push(sparks);
+
+  // ── 草 ──
+  if (filled >= 21) {
+    const gh = 16 * k * 1.6;
+    parts.push(`<g transform="translate(0 ${horizon - gh}) scale(${(W / 320).toFixed(3)} ${(gh / 40).toFixed(3)})">
+      <path d="${grassPath(40, 24, 0)}" fill="#3B4E63"/>
+      <path d="${grassPath(26, 37, 4)}" fill="#2A3A4C"/>
+    </g>`);
+  }
+
+  // ── 河燈 ──
+  if (reached >= 324) {
+    [0.28, 0.52, 0.74].forEach((t, i) => {
+      const s = k * 1.5 * (1 - i * 0.08);
+      parts.push(`<g transform="translate(${px(t * 100)} ${horizon - (4 + i * 3) * k}) scale(${s.toFixed(2)})" fill="#3E5268">${BOAT_ART}</g>`);
+    });
+  }
+
+  // ── 走過的人、出家人 ──
+  // 動畫定在「人剛好走到畫面裡」那一刻，不是省略不畫。
+  if (filled >= 21) {
+    const s = k * 1.5;
+    parts.push(`<g transform="translate(${px(34)} ${horizon - 21 * s}) scale(${s.toFixed(2)})" fill="#44586E">${WALKER_ART}</g>`);
+  }
+  if (reached >= 216) {
+    const s = k * 1.7;
+    parts.push(`<g transform="translate(${px(58)} ${horizon - 26 * s}) scale(${s.toFixed(2)})" fill="#4E6076">${MONK_ART}</g>`);
+  }
+
+  // ── 雪 ──
+  if (amb.snow) {
+    parts.push([...Array(60)].map((_, i) => {
+      const x = px((i * 37.7) % 100);
+      const y = py((i * 61.3) % 96);
+      const r = (0.8 + (i % 3) * 0.5) * k;
+      return `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r.toFixed(1)}" fill="#DCE6F0" opacity="${(0.25 + (i % 4) * 0.12).toFixed(2)}"/>`;
+    }).join(''));
+  }
+
+  return parts.join('');
+}
+
+/** 一盞燈在圖卡上的樣子：暈、芯，難得的加一圈金。 */
+function sparkSVG(p, i, px, py, k) {
+  const f = FLAMES[p.lamp.flame] || FLAMES.gamboge;
+  const tier = p.lamp.tier || 'common';
+  const base = { common: 7, uncommon: 9, rare: 12 }[tier] || 7;
+  const g = Math.max(0, Math.min(1, p.glow || 0));
+
+  const core = base * (1 + 0.5 * g) * k * 0.55;
+  const halo = core * (3.2 + 2.6 * g);
+  const x = px(p.x);
+  const y = py(p.y);
+  const id = `g${i}`;
+
+  const ring = tier === 'rare'
+    ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(core + 2.4 * k).toFixed(1)}" fill="none" stroke="${GILT.rim}" stroke-width="${(1.5 * k).toFixed(1)}"/>`
+    : tier === 'uncommon'
+      ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(core + 1.6 * k).toFixed(1)}" fill="none" stroke="${GILT.rim}" stroke-width="${(0.9 * k).toFixed(1)}"/>`
+      : '';
+
+  return `<radialGradient id="${id}" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="${f.halo}" stop-opacity="${(0.85 + 0.15 * g).toFixed(2)}"/>
+      <stop offset="70%" stop-color="${f.halo}" stop-opacity="0"/>
+    </radialGradient>
+    <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${halo.toFixed(1)}" fill="url(#${id})"/>
+    <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${core.toFixed(1)}" fill="${f.outer}"/>
+    ${ring}`;
 }

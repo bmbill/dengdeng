@@ -12,6 +12,7 @@ import { esc, icon, sheet, closeSheet, toast } from '../ui.js';
 import { showMyDay, showSharedLamp } from './lampcard.js';
 import { renderLamp, renderSpark, glowOf } from '../lamp.js';
 import { stageClasses, sceneryHTML, nextMilestone, sceneOf, SKY_STAGES, LIFE_STAGES } from '../sky.js';
+import { shareSky } from '../share.js';
 import { SKY_SIZE, SKY_RENDER_CAP, isOnlineMode } from '../config.js';
 
 /* 跨重繪保留的檢視狀態 */
@@ -209,6 +210,7 @@ async function renderGroup(root, go) {
           <div class="t">${info.isFull ? `這片天空滿了 · ${info.filled} 盞` : `這片天空 ${info.filled} 盞`}</div>
           <div class="s">${info.authors} 個人${info.pages ? ` · 誦經 ${info.pages} 頁` : ''}${info.filled > shown ? ` · 畫出其中 ${shown} 盞` : ''}</div>
         </div>
+        <button class="btn sm on-night" data-share-sky>${info.isFull ? '分享這片天空' : '分享'}</button>
       </div>` : ''}
     </div>
 
@@ -224,6 +226,9 @@ async function renderGroup(root, go) {
     b.addEventListener('click', () => openShared(b.dataset.lampId, root, go));
   });
 
+  body.querySelector('[data-share-sky]')?.addEventListener('click', (e) =>
+    doShareSky(e.currentTarget, { info, spots, reached, groupName: group ? group.name : '' }));
+
   body.querySelector('[data-prev]').addEventListener('click', () => {
     if (!hasPrev) return toast('再往前就沒有天空了');
     view.skyBack += 1;
@@ -235,6 +240,28 @@ async function renderGroup(root, go) {
     view.skyBack -= 1;
     render(root, go);
   });
+}
+
+/**
+ * 把這片天空畫成一張圖。
+ *
+ * 滿了那一刻最值得分享，但沒滿也能分享——「我們走到 62 盞了」
+ * 本來就是一句話。
+ */
+async function doShareSky(btn, ctx) {
+  const was = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '正在畫…';
+  try {
+    const r = await shareSky(ctx);
+    if (r === 'saved') toast('圖卡存好了，可以傳給大家');
+  } catch (e) {
+    console.warn('[燈燈悅心] 天空圖卡失敗', e);
+    toast('圖卡做不出來，換個瀏覽器試試');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = was;
+  }
 }
 
 /** 這片天空涵蓋哪幾天。數量制切出來的，所以日期是結果不是條件。 */

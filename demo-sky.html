@@ -31,6 +31,8 @@
     .freeze .sky-monk svg { animation: none; }
     .freeze .sky-geese  { animation: none; left: 54%; opacity: .8; }
     .freeze .tower-lamp { animation: none; opacity: .9; }
+    .cardshot { margin-top: 12px; }
+    .cardshot img { width: 100%; border-radius: var(--r-l); box-shadow: var(--shadow); display: block; }
   </style>
 </head>
 <body>
@@ -49,6 +51,7 @@
 import { makeLamp } from './src/lamp.js';
 import { sceneryHTML, stageClasses, SKY_STAGES, LIFE_STAGES, SCENES } from './src/sky.js';
 import { layoutOf, paint, reflect, startWind } from './src/views/sea.js';
+import { makeSkyCard } from './src/share.js';
 
 /** 造一批假的燈，只存在記憶體裡。 */
 function fakeLamps(n, salt = 'demo') {
@@ -127,11 +130,35 @@ SCENES.forEach((sc, i) => {
     <h3>第 ${i + 1} 片 · ${sc.name}</h3>
     <div class="what">滿了 108 盞</div>
     ${sky({ filled: 108, reached: 540, skyNo: i + 1, foot: `這片天空滿了 · 108 盞` })}
+    <div class="cardshot"><button class="btn sm" data-card="${i + 1}">看這片的分享圖卡</button></div>
   </section>`);
 });
 
 const out = document.getElementById('out');
 out.innerHTML = parts.join('');
+
+out.querySelectorAll('[data-card]').forEach((b) => {
+  b.addEventListener('click', async () => {
+    const skyNo = Number(b.dataset.card);
+    b.disabled = true;
+    b.textContent = '正在畫…';
+    const lamps = fakeLamps(108, `s${skyNo}`);
+    const blob = await makeSkyCard({
+      info: {
+        skyNo, size: 108, filled: 108, isFull: true, totalSkies: 3,
+        authors: 17, entries: 214, pages: 860,
+        fromDay: '2026-09-01', toDay: '2026-09-15',
+      },
+      spots: layoutOf(lamps, { avoidMoon: true }),
+      reached: 540,
+      groupName: '週三共學',
+    });
+    const img = new Image();
+    img.src = URL.createObjectURL(blob);
+    b.parentElement.appendChild(img);
+    b.remove();
+  });
+});
 
 // 風向會轉，所有天空一起轉
 startWind();
