@@ -30,7 +30,7 @@ begin
   -- 撞到同一天的，留「被回應比較多」的那一份。
   -- 內容兩邊一樣，差別只在隨喜和留言掛在哪一盞上——那些是別人給的，
   -- 弄丟了補不回來，所以以它為準，不是以時間為準。
-  with both as (
+  with clash as (
     select d.id as dead_id, l.id as live_id,
            (select count(*) from reactions r where r.lamp_id = d.id)
          + (select count(*) from replies  r where r.lamp_id = d.id) as dead_n,
@@ -44,7 +44,7 @@ begin
   delete from lamps
   where id in (
     select case when (dead_n, dead_e) > (live_n, live_e) then live_id else dead_id end
-    from both
+    from clash
   );
   get diagnostics n = row_count;
   raise notice '撞到同一天而刪掉的：% 盞', n;
