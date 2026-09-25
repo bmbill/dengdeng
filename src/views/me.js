@@ -95,7 +95,9 @@ export function render(root, go) {
   if (pushSlot) mountPush(pushSlot);
 }
 
-const TIMES = ['07:00', '12:00', '18:00', '20:00', '21:00', '22:00'];
+// 整點，24 個。Worker 那邊的 dueNow() 收任何 HH:MM，
+// 所以要加半點也只是改這一行。
+const TIMES = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`);
 
 /**
  * 每天提醒。狀態要問瀏覽器才知道（訂閱在 service worker 那邊），
