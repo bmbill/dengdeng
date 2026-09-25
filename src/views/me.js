@@ -6,6 +6,7 @@ import { copyText } from '../invite.js';
 import * as SB from '../supabase.js';
 import { isOnlineMode } from '../config.js';
 import * as PUSH from '../push.js';
+import * as INSTALL from '../install.js';
 
 export function render(root, go) {
   const me = S.me();
@@ -57,6 +58,17 @@ export function render(root, go) {
         </div>
       </section>
 
+      ${!INSTALL.isStandalone() ? `
+      <section class="card">
+        <div class="card-title">裝到主畫面</div>
+        <p class="small" style="margin-top:6px">
+          ${INSTALL.isIOS()
+            ? `現在是在瀏覽器裡。按分享鍵 ${INSTALL.SHARE_ICON} →「加入主畫面」，之後都從那個圖示打開。iPhone 上這兩邊的紀錄是分開的，而且通知只給裝起來的那一個。`
+            : '裝到主畫面之後可以離線用，也收得到提醒。'}
+        </p>
+        ${INSTALL.canPrompt() ? '<button class="btn btn-full" style="margin-top:12px" data-install>加入主畫面</button>' : ''}
+      </section>` : ''}
+
       ${PUSH.isPushMode() ? `
       <section class="card">
         <div class="card-title">每天提醒</div>
@@ -90,6 +102,15 @@ export function render(root, go) {
   root.querySelector('[data-export]').addEventListener('click', doExport);
   root.querySelector('[data-import]').addEventListener('click', () => doImport(go));
   root.querySelector('[data-show-code]')?.addEventListener('click', showCode);
+
+  root.querySelector('[data-install]')?.addEventListener('click', async (e) => {
+    e.currentTarget.disabled = true;
+    const ok = await INSTALL.promptInstall();
+    if (!ok) {
+      e.currentTarget.disabled = false;
+      toast('沒有裝成功，可以從瀏覽器選單再試一次');
+    }
+  });
 
   const pushSlot = root.querySelector('[data-push-slot]');
   if (pushSlot) mountPush(pushSlot);

@@ -13,8 +13,82 @@ import * as SB from '../supabase.js';
 import { esc, sheet, closeSheet, toast } from '../ui.js';
 import { renderLamp } from '../lamp.js';
 import { isOnlineMode } from '../config.js';
+import * as INSTALL from '../install.js';
+
+// 這一關只擋一次。按了「先在瀏覽器看看」就不再出現，
+// 不然每次重整都要再看一遍，那就變成煩人的橫幅了。
+let skippedInstall = false;
+
+/**
+ * 裝到主畫面。
+ *
+ * iPhone 沒有安裝 API，只能把步驟畫出來；Android 和桌機 Chrome
+ * 有 beforeinstallprompt，那邊是真的一鍵。兩條路的文案不一樣，
+ * 寫成同一段會兩邊都講不清楚。
+ */
+function renderInstall(root, next) {
+  const oneTap = INSTALL.canPrompt();
+  const ios = INSTALL.isIOS();
+
+  root.innerHTML = `
+    <div class="welcome">
+      <div class="welcome-top">
+        <div class="welcome-lamp">
+          ${renderLamp({ form: 'petal', bowl: 'azurite', flame: 'azure' }, { size: 96 })}
+        </div>
+        <h1>先裝到主畫面</h1>
+        <p class="welcome-lede">
+          裝起來才收得到提醒，<br>紀錄也才會留在同一個地方。
+        </p>
+      </div>
+
+      <div class="welcome-form">
+        ${oneTap ? `
+          <button class="btn btn-full" data-install>加入主畫面</button>
+        ` : ios ? `
+          <ol class="install-steps">
+            <li>按下方工具列的分享鍵 ${INSTALL.SHARE_ICON}</li>
+            <li>往下找「加入主畫面」</li>
+            <li>之後都從桌面那個圖示打開</li>
+          </ol>
+        ` : `
+          <p class="small">
+            在瀏覽器的選單裡找「安裝」或「加入主畫面」。
+          </p>
+        `}
+
+        <p class="small" style="margin-top:16px">
+          ${ios
+            ? 'iPhone 上，瀏覽器裡的這個網站和主畫面的 app 是分開的兩份——在這裡寫的東西不會跟著過去，通知也只給裝起來的那一個。這是 Safari 的規定。'
+            : '裝起來之後可以離線用，也收得到提醒。'}
+        </p>
+
+        <button class="welcome-skip" data-skip>先在瀏覽器看看</button>
+      </div>
+    </div>
+  `;
+
+  root.querySelector('[data-install]')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    const ok = await INSTALL.promptInstall();
+    if (ok) return;  // 裝好之後他會從新圖示打開，這一頁不用再動
+    btn.disabled = false;
+    toast('沒有裝成功，可以從瀏覽器選單再試一次');
+  });
+
+  root.querySelector('[data-skip]').addEventListener('click', () => {
+    skippedInstall = true;
+    next();
+  });
+}
 
 export function render(root, done, invite = null) {
+  // 裝到主畫面這一關要擺在取名字之前。擺後面的話，他已經在瀏覽器裡
+  // 建了一份紀錄，裝完打開又是空的——iOS 上那是兩個儲存空間。
+  if (!INSTALL.isStandalone() && !skippedInstall) {
+    return renderInstall(root, () => render(root, done, invite));
+  }
   const invited = Boolean(invite && isOnlineMode());
 
   root.innerHTML = `

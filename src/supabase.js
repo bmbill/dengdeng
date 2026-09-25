@@ -45,7 +45,7 @@ let identityChanged = false;
  *
  * 所以拿到 session 之後要跟伺服器確認一次；人不在就丟掉重新登入。
  */
-export async function ensureSession() {
+export async function ensureSession({ create = false } = {}) {
   if (sessionUser) return sessionUser;
 
   // 同時進來的呼叫共用同一個登入。
@@ -53,13 +53,17 @@ export async function ensureSession() {
   // Promise.all 同時發兩個 RPC 會讓兩邊都看到 null、
   // 兩邊都去 signInAnonymously()，生出兩個匿名身分——
   // 其中一個立刻變成沒人認領的孤兒。
-  if (sessionPromise) return sessionPromise;
+  if (sessionPromise) {
+    const u = await sessionPromise;
+    if (u || !create) return u;
+    // 剛才那次是「只讀，不要新建」。這次真的需要身分，重跑一次。
+  }
 
-  sessionPromise = openSession().finally(() => { sessionPromise = null; });
+  sessionPromise = openSession(create).finally(() => { sessionPromise = null; });
   return sessionPromise;
 }
 
-async function openSession() {
+async function openSession(create) {
   const sb = await client();
   if (!sb) return null;
 
@@ -92,6 +96,12 @@ async function openSession() {
     await sb.auth.signOut({ scope: 'local' }).catch(() => {});
   }
 
+  // 到這裡表示這台裝置還沒有身分。只是看看的人不該在伺服器上
+  // 留下一筆——尤其 iOS 上「Safari 試用」和「主畫面的 app」是
+  // 兩個獨立的儲存空間，各登一次就會在群裡變成兩個人。
+  // 真的要寫東西（加群、供燈、隨喜）時才建。
+  if (!create) return null;
+
   const { data, error } = await sb.auth.signInAnonymously();
   if (error) {
     console.warn('[燈燈悅心] 匿名登入失敗', error.message);
@@ -110,9 +120,11 @@ export async function myUserId() {
 }
 
 /** 一律走這支呼叫 RPC，省掉每個地方都寫一次防呆。 */
-async function rpc(name, args, { silent = false } = {}) {
+async function rpc(name, args, { silent = false, create = false } = {}) {
   const sb = await client();
-  const user = await ensureSession();
+  // create 預設 false：純讀取的呼叫不該把一個只是開來看看的人
+  // 變成伺服器上的一筆身分。要寫東西的那幾支自己傳 true。
+  const user = await ensureSession({ create });
   if (!sb || !user) {
     if (silent) return null;
     throw new Error('目前沒有連上伺服器');
@@ -129,9 +141,9 @@ async function rpc(name, args, { silent = false } = {}) {
 }
 
 /** 把本機的名字同步成 profile。 */
-export async function syncProfile() {
+export async function syncProfile({ create = false } = {}) {
   const sb = await client();
-  const user = await ensureSession();
+  const user = await ensureSession({ create });
   if (!sb || !user) return null;
   const me = S.me();
   const { error } = await sb.from('profiles').upsert({
@@ -167,11 +179,11 @@ async function rejoinFromLocal() {
   const codes = S.myGroups().map((g) => g.inviteCode).filter(Boolean);
   if (!codes.length) return false;
 
-  await syncProfile().catch(() => {});
+  await syncProfile({ create: true }).catch(() => {});
   let ok = 0;
   for (const code of codes) {
     try {
-      await rpc('join_group', { code });
+      await rpc('join_group', { code }, { create: true });
       ok += 1;
     } catch (e) {
       // 這台已經被接走了。再試下去只會把同一則錯誤跑一遍，
@@ -224,8 +236,8 @@ export async function myGroups({ silent = true, heal = true } = {}) {
 }
 
 export async function createGroup(name) {
-  await syncProfile();
-  const data = await rpc('create_group', { group_name: name });
+  await syncProfile({ create: true });
+  const data = await rpc('create_group', { group_name: name }, { create: true });
   const g = Array.isArray(data) ? data[0] : data;
   await myGroups({ silent: false });
   return { id: g.id, name: g.name, inviteCode: g.invite_code };
@@ -237,8 +249,8 @@ export async function createGroup(name) {
  * 不然任何人都能把所有群的邀請碼撈出來。
  */
 export async function joinGroup(code) {
-  await syncProfile();
-  const data = await rpc('join_group', { code });
+  await syncProfile({ create: true });
+  const data = await rpc('join_group', { code }, { create: true });
   const g = Array.isArray(data) ? data[0] : data;
   if (!g) throw new Error('找不到這個邀請碼');
   await myGroups({ silent: false });
@@ -268,7 +280,7 @@ export async function publishLamp(day, groupIds) {
     p_entries: entries,
     p_pages: pages,
     p_groups: groupIds || [],
-  });
+  }, { create: true });
 }
 
 /**
@@ -336,6 +348,7 @@ export async function catchUp() {
   try {
     // 名字放在這裡同步，不放在加入群的時候——被管理員直接加進群的人
     // 從來不會經過那條路，群裡就會看到一個「無名」。
+    // 不新建身分：還沒有身分的人本來就沒有 profile 要同步。
     await syncProfile();
     const groups = await myGroups();
     if (retiredMsg) return { sent: 0, retired: retiredMsg };
@@ -359,8 +372,8 @@ export async function unpublishLamp(day) {
  * 我的接回碼。伺服器第一次被問到的時候才生成，沒人用到就不存在。
  */
 export async function myRecoveryCode() {
-  await syncProfile();
-  return rpc('my_recovery_code', {});
+  await syncProfile({ create: true });
+  return rpc('my_recovery_code', {}, { create: true });
 }
 
 /**
@@ -371,8 +384,8 @@ export async function myRecoveryCode() {
  */
 export async function reclaimIdentity(code) {
   // 先建 profile：接回那一步要往新身分的 profile 寫名字和碼
-  await syncProfile();
-  const rows = await rpc('reclaim_identity', { code });
+  await syncProfile({ create: true });
+  const rows = await rpc('reclaim_identity', { code }, { create: true });
   const r = Array.isArray(rows) ? rows[0] : rows;
   if (!r) throw new Error('接不回來');
   return { name: r.name, lamps: Number(r.lamps || 0), groups: Number(r.groups || 0) };
@@ -486,7 +499,7 @@ export async function lampDetail(lampId) {
 /** 隨喜／取消隨喜。回傳這盞燈現在有沒有被我隨喜。 */
 export async function toggleJoy(lampId, on) {
   const sb = await client();
-  const user = await ensureSession();
+  const user = await ensureSession({ create: true });
   if (!sb || !user) throw new Error('目前沒有連上伺服器');
 
   if (on) {
@@ -504,7 +517,7 @@ export async function toggleJoy(lampId, on) {
 /** 短回應。字數在資料庫端也有 CHECK 約束，不是只靠前端擋。 */
 export async function reply(lampId, body) {
   const sb = await client();
-  const user = await ensureSession();
+  const user = await ensureSession({ create: true });
   if (!sb || !user) throw new Error('目前沒有連上伺服器');
   const { error } = await sb.from('replies')
     .insert({ lamp_id: lampId, author_id: user.id, body: body.slice(0, 60) });

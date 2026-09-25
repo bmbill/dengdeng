@@ -728,3 +728,15 @@ button.sea-lamp:focus-visible { outline: 2px solid var(--night-ink); outline-off
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* 裝到主畫面的步驟。iPhone 上沒有安裝 API，只能把步驟寫出來，
+   所以它要夠清楚——數字、間距都比一般段落鬆一點。 */
+.install-steps {
+  margin: 4px 0 0;
+  padding-left: 1.4em;
+  color: var(--muted);
+  font-size: .82rem;
+  line-height: 1.9;
+}
+.install-steps li { padding-left: 2px; }
+.install-steps li::marker { color: var(--cinnabar-d); font-weight: 600; }

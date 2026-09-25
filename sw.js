@@ -6,7 +6,7 @@
  * 改完程式記得把 VERSION 加一，不然舊快取不會換掉。
  */
 
-const VERSION = 'v41';
+const VERSION = 'v42';
 const CACHE = `dengdeng-${VERSION}`;
 
 const SHELL = [

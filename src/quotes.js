@@ -143,7 +143,7 @@ export const VOICES = {
 
   /* 短、務實、帶點自嘲。做事的人的語氣。 */
   sweeper: {
-    name: '掃地阿伯',
+    name: '掃地的老和尚',
     art: (size = 38) => avatar('sweeper', size),
     lines: {
       any: [
