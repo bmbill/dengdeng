@@ -16,7 +16,7 @@
  * 冬天飄雪、清晨天色轉淡。月相本來就跟外面同步，這是往下接同一件事。
  */
 
-import { FLAMES, GILT } from './lamp.js';
+import { FLAMES, BOWLS, GILT } from './lamp.js';
 
 /* ── 場景 ──
  * 每一片天空換一種底。不用設定、不用改資料庫，而且「下一片是什麼」
@@ -472,9 +472,27 @@ export function skySVG(o) {
   return parts.join('');
 }
 
-/** 一盞燈在圖卡上的樣子：暈、芯，難得的加一圈金。 */
+/**
+ * 把顏色往白色拉，確保它在夜空上亮得起來。
+ * 燈身色有深到 #3A4A6B 的（螺青），原樣畫在夜空上等於看不見。
+ */
+function lift(hex, t = 0.45) {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (c) => Math.round(c + (255 - c) * t);
+  return `rgb(${mix(n >> 16 & 255)},${mix(n >> 8 & 255)},${mix(n & 255)})`;
+}
+
+/**
+ * 一盞燈在天上的樣子：暈、芯，難得的加一圈金。
+ *
+ * 暈用燈身色，芯用焰色。真實的燈就是這樣——火光是暖的，
+ * 但光是透過燈身透出來的，藍燈身暈出來就是藍的。
+ * 兩個都用焰色的話，手上抽到一盞藍燈、到天上變成一顆白點，
+ * 對不起來；而且焰色只有 6 種，整片天空會單調很多。
+ */
 function sparkSVG(p, i, px, py, k) {
   const f = FLAMES[p.lamp.flame] || FLAMES.gamboge;
+  const b = BOWLS[p.lamp.bowl] || BOWLS.cinnabar;
   const tier = p.lamp.tier || 'common';
   const base = { common: 7, uncommon: 9, rare: 12 }[tier] || 7;
   const g = Math.max(0, Math.min(1, p.glow || 0));
@@ -492,8 +510,8 @@ function sparkSVG(p, i, px, py, k) {
       : '';
 
   return `<radialGradient id="${id}" cx="50%" cy="50%" r="50%">
-      <stop offset="0" stop-color="${f.halo}" stop-opacity="${(0.85 + 0.15 * g).toFixed(2)}"/>
-      <stop offset="70%" stop-color="${f.halo}" stop-opacity="0"/>
+      <stop offset="0" stop-color="${lift(b.light)}" stop-opacity="${(0.85 + 0.15 * g).toFixed(2)}"/>
+      <stop offset="70%" stop-color="${lift(b.light)}" stop-opacity="0"/>
     </radialGradient>
     <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${halo.toFixed(1)}" fill="url(#${id})"/>
     <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${core.toFixed(1)}" fill="${f.outer}"/>
