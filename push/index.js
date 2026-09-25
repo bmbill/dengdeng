@@ -5,7 +5,7 @@
  * 不做「今天還沒供燈才提醒」。伺服器上只有公開過的燈，沒公開的那幾則
  * 從來沒離開過手機——要判斷「今天記了沒」就一定會判錯，
  * 而「你今天還沒記喔」對一個其實已經記了的人來說是很煩的。
- * 所以文案一律寫成問句，不管記了沒讀起來都對。
+ * 所以文案一律寫成邀請（lines.js），不管記了沒讀起來都對。
  *
  * 部署：
  *   wrangler kv namespace create SUBS      把 id 填進 wrangler.toml
@@ -15,6 +15,7 @@
  */
 
 import { sendPush, generateVapidKeys } from './webpush.js';
+import { pickLine } from './lines.js';
 
 const CORS = {
   'access-control-allow-origin': '*',
@@ -27,19 +28,6 @@ const json = (o, status = 200) =>
     status,
     headers: { 'content-type': 'application/json', ...CORS },
   });
-
-// 提醒的句子。刻意都是問句或邀請，不是催促——
-// 這個 app 的重點是讓人想記，不是讓人怕漏。
-const LINES = [
-  { title: '今天的燈', body: '有沒有一件小事，值得記下來？' },
-  { title: '燈童', body: '天黑了，要不要來點一盞？' },
-  { title: '今天的燈', body: '一句就夠了。' },
-  { title: '掃地的', body: '今天掃到什麼好事沒有？' },
-  { title: '今天的燈', body: '想想今天誰幫了你。' },
-  { title: '寺裡的貓', body: '喵。你今天還沒來。' },
-  { title: '今天的燈', body: '記一則，燈就亮了。' },
-  { title: '池裡的蓮', body: '一天一盞，慢慢就是一片。' },
-];
 
 function getVapid(env) {
   return {
@@ -119,9 +107,9 @@ async function handleTest(req, env) {
   const sub = await env.SUBS.get(k, 'json');
   if (!sub) return json({ error: '找不到這個訂閱' }, 404);
 
-  const line = LINES[Math.floor(Math.random() * LINES.length)];
+  const line = pickLine(sub.state?.recent || []);
   const res = await sendPush(sub.subscription, JSON.stringify(line), getVapid(env));
-  return json({ ok: res.ok, status: res.status });
+  return json({ ok: res.ok, status: res.status, 送出的: line });
 }
 
 async function handleGenerateVapid() {
@@ -169,7 +157,7 @@ export default {
           const today = dueNow(sub.prefs, sub.state || {}, now);
           if (!today) continue;
 
-          const line = LINES[Math.floor(Math.random() * LINES.length)];
+          const line = pickLine(sub.state?.recent || []);
           const res = await sendPush(sub.subscription, JSON.stringify(line), vapid);
 
           // 404/410 是「這個訂閱已經沒了」（app 被移除、權限被收回）。
@@ -179,7 +167,10 @@ export default {
             continue;
           }
 
-          sub.state = { ...(sub.state || {}), lastSent: today };
+          // 記最近 40 句，抽的時候避開。真隨機在小樣本上
+          // 重複得比直覺頻繁，一週內撞到同一句會讓人覺得敷衍。
+          const recent = [...(sub.state?.recent || []), line.key].slice(-40);
+          sub.state = { ...(sub.state || {}), lastSent: today, recent };
           await env.SUBS.put(entry.name, JSON.stringify(sub));
         } catch (e) {
           console.error('push 失敗', entry.name, e.message);
