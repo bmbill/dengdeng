@@ -8,11 +8,14 @@ compatibility_date = "2024-09-01"
 crons = ["*/10 * * * *"]
 
 [vars]
-VAPID_PUBLIC = "（跑 /generate-vapid 之後填這裡）"
+VAPID_PUBLIC = "BOXBuHh-Ur8U1ZtH4slumYPahJm_8hHt0YsqCX5Wecy8CrOAur-r55ASUZi1JyD9f2iKea6N7noGyJD7bYRwMrc"
 VAPID_SUBJECT = "mailto:bmbill2000@gmail.com"
 
 # 私鑰是機密，不放這裡：wrangler secret put VAPID_PRIVATE_JWK
 
+# 名字取 DENGDENG_SUBS 而不是 SUBS：同一個 Cloudflare 帳號底下
+# karma-stories 已經有一個叫 SUBS 的了，KV 的名字是全帳號唯一的。
+# binding 仍叫 SUBS，所以程式裡用 env.SUBS 就好。
 [[kv_namespaces]]
 binding = "SUBS"
-id = "（wrangler kv namespace create SUBS 之後填這裡）"
+id = "8127e4c81a8743278e5f078befa2c605"

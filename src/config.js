@@ -79,7 +79,7 @@ export const isOnlineMode = () => Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_K
  * VAPID 公鑰跟 Supabase 那把一樣是公開的：它只是讓推播服務認得
  * 「這則是誰發的」。私鑰在 Worker 的 secret 裡，不在這裡。
  */
-export const PUSH_URL = '';
-export const VAPID_PUBLIC = '';
+export const PUSH_URL = 'https://dengdeng-push.karma-story-bmbill.workers.dev';
+export const VAPID_PUBLIC = 'BOXBuHh-Ur8U1ZtH4slumYPahJm_8hHt0YsqCX5Wecy8CrOAur-r55ASUZi1JyD9f2iKea6N7noGyJD7bYRwMrc';
 
 export const isPushMode = () => Boolean(PUSH_URL && VAPID_PUBLIC);
