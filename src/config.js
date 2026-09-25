@@ -67,3 +67,19 @@ export const DEFAULT_SUTRA = '大般若經';
 export const MONTHLY_GOAL = 500;
 
 export const isOnlineMode = () => Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
+
+/* ── 推播 ──
+ *
+ * 兩個都填了才會出現「每天提醒」那一區；留空就整個藏起來。
+ *
+ * PUSH_URL 是另外一支 Cloudflare Worker（push/ 目錄），跟網站本身分開部署——
+ * 推播要在沒人開著網頁的時候發，那得有個一直醒著的東西，
+ * 靜態網站做不到。部署步驟寫在 push/index.js 最上面。
+ *
+ * VAPID 公鑰跟 Supabase 那把一樣是公開的：它只是讓推播服務認得
+ * 「這則是誰發的」。私鑰在 Worker 的 secret 裡，不在這裡。
+ */
+export const PUSH_URL = '';
+export const VAPID_PUBLIC = '';
+
+export const isPushMode = () => Boolean(PUSH_URL && VAPID_PUBLIC);

@@ -1,0 +1,18 @@
+name = "dengdeng-push"
+main = "index.js"
+compatibility_date = "2024-09-01"
+
+# 每 10 分鐘掃一次。dueNow() 只認「當地時間落在設定時間之後的 10 分鐘內」，
+# 所以這個間隔要跟那裡的 10 分鐘一致，改一個就要改另一個。
+[triggers]
+crons = ["*/10 * * * *"]
+
+[vars]
+VAPID_PUBLIC = "（跑 /generate-vapid 之後填這裡）"
+VAPID_SUBJECT = "mailto:bmbill2000@gmail.com"
+
+# 私鑰是機密，不放這裡：wrangler secret put VAPID_PRIVATE_JWK
+
+[[kv_namespaces]]
+binding = "SUBS"
+id = "（wrangler kv namespace create SUBS 之後填這裡）"

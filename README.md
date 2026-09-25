@@ -357,6 +357,9 @@ src/
     me.js                我：名字、統計、備份
     welcome.js           第一次打開：取名字
     lampcard.js          點開一盞燈的小卡（日期當標題）
+push/                    推播用的 Cloudflare Worker，跟網站分開部署
+  index.js               訂閱、偏好、cron 推送
+  webpush.js             VAPID 簽章與加密，無相依套件
 supabase/
   schema.sql             建表 + RLS + RPC
   add-*.sql              後來加的，只有函式，可以在 app 活著的時候跑
@@ -404,3 +407,37 @@ design-mockup/           設計稿原始檔，不影響執行
 - 群主管理 UI（資料庫權限已經有了，見上面）
 - 離線時寫的東西自動補送到 Supabase（`store.js` 有排隊機制但還沒接上）
 - 引文核對（見上面的警告）
+
+
+---
+
+## 每天提醒（推播）
+
+靜態網站沒辦法在沒人開著網頁的時候發通知，所以推播是另外一支
+Cloudflare Worker（`push/`），跟主站分開部署。`src/config.js` 裡
+`PUSH_URL` 和 `VAPID_PUBLIC` 兩個都填了，「我」分頁才會出現這一區；
+留空就整個藏起來，其他功能照常。
+
+```bash
+cd push
+wrangler kv namespace create SUBS        # id 填進 wrangler.toml
+wrangler deploy
+curl https://<你的worker>/generate-vapid # 產一對金鑰
+wrangler secret put VAPID_PRIVATE_JWK    # 貼私鑰那整串 JSON
+```
+
+公鑰填兩個地方：`push/wrangler.toml` 的 `VAPID_PUBLIC`，和
+`src/config.js` 的 `VAPID_PUBLIC`。`PUSH_URL` 填 Worker 的網址。
+改完 `wrangler deploy` 再跑一次。
+
+**iPhone 要先「加入主畫面」。** Safari 分頁裡沒有 `PushManager`，
+不是壞掉，是 iOS 的限制（16.4 以上才有，而且只給裝到主畫面的）。
+app 裡會判斷這個狀況並講清楚，不會只是安靜地不動。
+
+Worker 每 10 分鐘掃一次訂閱，比對的是「使用者當地的時鐘」而不是
+預先算好的 UTC 時刻——後者要處理日光節約和「錯過一次就永遠往後推」，
+麻煩很多。時區跟著訂閱一起存，所以出國的人不會在半夜收到。
+
+推播內容刻意都是問句（「今天的燈點了嗎？」），不是「你今天還沒記」。
+伺服器上只有公開過的燈，判斷不了誰今天記了沒——與其猜錯去催一個
+其實已經記了的人，不如問一句，兩種情況讀起來都對。

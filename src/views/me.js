@@ -1,10 +1,11 @@
-/* 我 —— 名字、統計、備份、換手機 */
+/* 我 —— 名字、統計、備份、換手機、提醒 */
 
 import * as S from '../store.js';
 import { esc, sheet, closeSheet, toast } from '../ui.js';
 import { copyText } from '../invite.js';
 import * as SB from '../supabase.js';
 import { isOnlineMode } from '../config.js';
+import * as PUSH from '../push.js';
 
 export function render(root, go) {
   const me = S.me();
@@ -56,6 +57,12 @@ export function render(root, go) {
         </div>
       </section>
 
+      ${PUSH.isPushMode() ? `
+      <section class="card">
+        <div class="card-title">每天提醒</div>
+        <div data-push-slot><p class="small" style="margin-top:6px">讀取中…</p></div>
+      </section>` : ''}
+
       ${isOnlineMode() ? `
       <section class="card">
         <div class="card-title">換手機</div>
@@ -83,6 +90,87 @@ export function render(root, go) {
   root.querySelector('[data-export]').addEventListener('click', doExport);
   root.querySelector('[data-import]').addEventListener('click', () => doImport(go));
   root.querySelector('[data-show-code]')?.addEventListener('click', showCode);
+
+  const pushSlot = root.querySelector('[data-push-slot]');
+  if (pushSlot) mountPush(pushSlot);
+}
+
+const TIMES = ['07:00', '12:00', '18:00', '20:00', '21:00', '22:00'];
+
+/**
+ * 每天提醒。狀態要問瀏覽器才知道（訂閱在 service worker 那邊），
+ * 所以畫面先出來、這一區慢慢填。
+ */
+async function mountPush(slot) {
+  const why = {
+    'ios-needs-install': '在 iPhone 上，要先把這個 app「加入主畫面」，從那個圖示打開才收得到通知。Safari 分頁裡不行，這是 iOS 的限制。',
+    denied: '這台裝置封鎖了通知。要用的話得到系統設定裡把這個網站的通知打開。',
+    unsupported: '這個瀏覽器不支援通知。',
+  };
+
+  const s = PUSH.supported();
+  if (!s.ok) {
+    slot.innerHTML = `<p class="small" style="margin-top:6px">${esc(why[s.why] || '目前不能開啟提醒。')}</p>`;
+    return;
+  }
+
+  const on = Boolean(await PUSH.current());
+  const time = S.me().pushTime || '21:00';
+
+  slot.innerHTML = `
+    <p class="small" style="margin-top:6px">
+      ${on ? `每天 ${esc(time)} 提醒你來記一則。` : '每天挑一個時間提醒你來記一則。不會說你漏了什麼，只是問一句。'}
+    </p>
+    <select class="field" style="margin-top:12px" data-time aria-label="提醒時間">
+      ${TIMES.map((t) => `<option value="${t}"${t === time ? ' selected' : ''}>每天 ${t}</option>`).join('')}
+    </select>
+    <button class="btn${on ? ' ghost' : ''} btn-full" style="margin-top:12px" data-toggle>
+      ${on ? '關掉提醒' : '開啟提醒'}
+    </button>
+    ${on ? '<button class="btn ghost btn-full" style="margin-top:10px" data-test>馬上試一則</button>' : ''}`;
+
+  const sel = slot.querySelector('[data-time]');
+  const btn = slot.querySelector('[data-toggle]');
+
+  sel.addEventListener('change', async () => {
+    S.setMe({ pushTime: sel.value });
+    if (!on) return;   // 還沒開啟的話，時間等按下去才一起送
+    try {
+      await PUSH.setTime(sel.value);
+      toast(`改成每天 ${sel.value}`);
+      mountPush(slot);
+    } catch (e) {
+      toast(e.message || '改不了時間');
+    }
+  });
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = on ? '正在關…' : '正在開…';
+    try {
+      if (on) {
+        await PUSH.disable();
+        toast('提醒關掉了');
+      } else {
+        // requestPermission 一定要在這個 click 裡面發生，
+        // 不然瀏覽器會當成沒有使用者動作直接忽略。
+        const ok = await PUSH.enable(sel.value);
+        toast(ok ? `開好了，每天 ${sel.value}` : '沒有拿到通知權限');
+      }
+    } catch (e) {
+      toast(e.message || '這一步失敗了');
+    }
+    mountPush(slot);
+  });
+
+  slot.querySelector('[data-test]')?.addEventListener('click', async () => {
+    try {
+      await PUSH.test();
+      toast('送出去了，幾秒內會跳出來');
+    } catch (e) {
+      toast(e.message || '試不出來');
+    }
+  });
 }
 
 /** 顯示接回碼。要按了才去拿——沒人用到的話，伺服器上就不會有這組碼。 */

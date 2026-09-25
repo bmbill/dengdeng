@@ -6,7 +6,7 @@
  * 改完程式記得把 VERSION 加一，不然舊快取不會換掉。
  */
 
-const VERSION = 'v37';
+const VERSION = 'v38';
 const CACHE = `dengdeng-${VERSION}`;
 
 const SHELL = [
@@ -86,4 +86,35 @@ self.addEventListener('fetch', (e) => {
       })
     );
   }
+});
+
+/* ── 推播 ──
+ *
+ * 內容由 push Worker 送來，這裡只負責顯示。
+ * payload 壞掉也要顯示一則：iOS 會統計「收到但沒顯示」的次數，
+ * 累積多了會直接把這個網站的推播權限收掉。
+ */
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { /* 不是 JSON 就用預設 */ }
+  e.waitUntil(self.registration.showNotification(d.title || '燈燈悅心', {
+    body: d.body || '今天的燈點了嗎？',
+    icon: './icons/icon-192.png',
+    badge: './icons/icon-192.png',
+    tag: 'dengdeng-daily',   // 同一個 tag：沒讀的舊通知會被新的蓋掉，不會疊一整排
+    data: { url: './' },
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const target = new URL(e.notification.data?.url || './', self.location.origin).href;
+  e.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    // 已經開著就把它叫到前面，不要再開一個分頁
+    for (const w of wins) {
+      if (w.url.startsWith(self.location.origin) && 'focus' in w) return w.focus();
+    }
+    return self.clients.openWindow(target);
+  })());
 });
