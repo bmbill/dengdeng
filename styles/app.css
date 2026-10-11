@@ -740,3 +740,27 @@ button.sea-lamp:focus-visible { outline: 2px solid var(--night-ink); outline-off
 }
 .install-steps li { padding-left: 2px; }
 .install-steps li::marker { color: var(--cinnabar-d); font-weight: 600; }
+
+/* 今天這盞燈的候選。並排讓人自己挑。
+   用 radiogroup 的語意，不是一堆按鈕——它表達的是「選其中一個」。 */
+.picks { display: flex; gap: 10px; }
+.pick {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 6px 9px;
+  background: var(--paper-2);
+  border: 1.5px solid transparent;
+  border-radius: 14px;
+  cursor: pointer;
+  /* 沒選到的壓暗一點，一眼看得出現在供的是哪一盞 */
+  opacity: .62;
+  transition: opacity .18s, border-color .18s, background .18s;
+}
+.pick.on {
+  opacity: 1;
+  border-color: var(--cinnabar-d);
+  background: var(--paper);
+}
+.pick-lamp { display: block; line-height: 0; }
+.pick-name { font-size: .78rem; font-weight: 600; color: var(--ink); }
+.pick-tier { font-size: .66rem; color: var(--muted); }

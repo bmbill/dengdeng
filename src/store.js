@@ -146,7 +146,9 @@ export function emptyDay(date) {
     lamp: null,
     sealedAt: null,
     isPublic: false,
-    draws: 0,             // 今天抽過幾次。一則一抽，只往上換
+    draws: 0,             // 今天抽過幾次。一則一抽
+    pool: [],             // 抽到的每一盞都留著當候選
+    pick: 0,              // 現在供的是 pool 裡的第幾盞
     askedShare: false,    // 今天問過「要發到哪幾個群」了沒
   };
 }
@@ -155,6 +157,10 @@ export function emptyDay(date) {
 function normalize(day) {
   if (!Array.isArray(day.entries)) day.entries = [];
   if (!Array.isArray(day.joys)) day.joys = [];
+  // 舊資料只有一盞 lamp，沒有候選的概念。把它當成唯一的候選，
+  // 這樣後面的程式只要處理 pool 一種形狀。
+  if (!Array.isArray(day.pool)) day.pool = day.lamp ? [day.lamp] : [];
+  if (typeof day.pick !== 'number' || !day.pool[day.pick]) day.pick = 0;
   return day;
 }
 
@@ -254,6 +260,8 @@ export function removeEntry(id, date = todayStr()) {
   if (day.entries.length || day.joys.length) return refreshLamp(date);
 
   day.lamp = null;
+  day.pool = [];
+  day.pick = 0;
   day.sealedAt = null;
   day.draws = 0;
   day.isPublic = false;
@@ -288,6 +296,8 @@ export function removeJoy(lampId, date = todayStr()) {
 
   // 今天只有那一下隨喜，收回來就等於今天還沒開始
   day.lamp = null;
+  day.pool = [];
+  day.pick = 0;
   day.sealedAt = null;
   day.draws = 0;
   return saveDay(day);
@@ -358,7 +368,9 @@ export function seal(date = todayStr()) {
 
   day.isFirst = lamps().length === 0;
   day.draws = 1;
-  day.lamp = buildLamp(day, 1);
+  day.pool = [buildLamp(day, 1)];
+  day.pick = 0;
+  day.lamp = day.pool[0];
   day.sealedAt = new Date().toISOString();
   return saveDay(day);
 }
@@ -374,46 +386,54 @@ export function refreshLamp(date = todayStr()) {
   const day = getDay(date);
   if (!day.lamp || date !== todayStr()) return day;
 
+  // 顏色跟著今天的紀錄走，形制是抽到的，不動。
+  // 每一盞候選都要更新——不然換過去會看到一盞顏色停在幾則之前的燈。
   const next = buildLamp(day, day.draws || 1);
-  day.lamp = { ...next, form: day.lamp.form, tier: day.lamp.tier, name: day.lamp.name };
+  day.pool = day.pool.map((l) => ({ ...next, form: l.form, tier: l.tier, name: l.name }));
+  day.lamp = day.pool[day.pick];
   return saveDay(day);
 }
 
 /**
- * 再抽一次。
+ * 再抽一盞。
  *
- * 只往上：抽到比現在這盞難得才換，不然留著原本那盞。
- * 補寫一則是「多一次機會」，不是「拿已經到手的燈去賭」——
- * 不然就會有人為了不弄丟難得的燈而不敢再寫。
+ * 抽到的留著當候選，不會取代現在這盞——取捨交給人。
+ * 原本是「只往上換」，用意是別讓人為了保住難得的燈而不敢再寫；
+ * 那個保證現在更強：抽到的都留著，寫越多只會候選越多，不可能變差。
  *
- * @returns {{drawn, before, kept, lamp, left}|null}
+ * @returns {{drawn:object, index:number, left:number}|null}
  */
 export function redraw(date = todayStr()) {
   const day = getDay(date);
   if (!day.lamp || date !== todayStr() || drawsLeft(day) <= 0) return null;
 
-  const before = day.lamp;
   day.draws = (day.draws || 1) + 1;
-
   const drawn = buildLamp(day, day.draws);
-  const kept = TIER_RANK[drawn.tier] > TIER_RANK[before.tier];
-  // 沒換形制也要收下新的顏色：那是今天多寫的那一則算出來的。
-  day.lamp = kept ? drawn : { ...drawn, form: before.form, tier: before.tier, name: before.name };
+  day.pool.push(drawn);
+  // 直接換成新抽到的，揭曉畫面上那盞大的才是「你現在供的」。
+  // 不換的話，剛抽完卻看到舊的那盞，講不通。
+  // 這不是舊的「只往上」——它一秒就能點回去，而且舊的沒有消失。
+  day.pick = day.pool.length - 1;
+  day.lamp = drawn;
   saveDay(day);
 
-  return { drawn, before, kept, lamp: day.lamp, left: drawsLeft(day) };
+  return { drawn, index: day.pool.length - 1, left: drawsLeft(day) };
 }
 
 /**
- * 補上沒亮起來的燈。
+ * 改供候選裡的第 n 盞。當天隨時可以換。
  *
- * 改成「寫下去就供燈」之後，這裡多半沒事做了——留著是因為
- * 舊版本存下來的日子還沒有燈，以及偶爾寫得進 localStorage、
- * 燈卻沒存成功的意外。只補「過去」的：今天的不補，
- * 今天要嘛已經亮了，要嘛你還沒寫。
- *
- * @returns 補了哪幾天
+ * 只限今天：過去那幾天的燈已經是發生過的事，而且可能早就發到群裡、
+ * 被人隨喜過了，不該再動。
  */
+export function pickLamp(n, date = todayStr()) {
+  const day = getDay(date);
+  if (date !== todayStr() || !day.pool[n] || day.pick === n) return day;
+  day.pick = n;
+  day.lamp = day.pool[n];
+  return saveDay(day);
+}
+
 export function sealOverdue() {
   const today = todayStr();
   const done = [];

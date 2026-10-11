@@ -2,14 +2,15 @@
  *
  * 兩種開法：
  *   寫下第一則的當下（燈亮了）
- *   之後按「再抽一次」（opts.draw），只往上換，換不換都據實講
+ *   之後按「再抽一次」（opts.draw）——抽到的都留著，底下並排讓人自己挑
  */
 
 import * as S from '../store.js';
 import { esc, icon, fullscreen, toast } from '../ui.js';
-import { renderLamp, TIER_LABEL, TIER_RANK, GILT_LABEL, FLAMES, BOWLS, FORMS } from '../lamp.js';
+import { renderLamp, TIER_LABEL, GILT_LABEL, FLAMES, BOWLS, FORMS } from '../lamp.js';
 import { sayingFor, quoteFor, citationOf } from '../quotes.js';
 import { shareCard } from '../share.js';
+import { picksHTML, bindPicks } from './picks.js';
 
 /** 「今天寫了兩則」／「今天隨喜了三盞」——只有隨喜燈也會亮。 */
 function summaryLine(day) {
@@ -24,7 +25,7 @@ function summaryLine(day) {
 /**
  * @param {object} day 今天（燈已經亮著）
  * @param {function} onClose
- * @param {{draw?:object, onRedraw?:function}} opts draw 是 store.redraw() 的結果
+ * @param {{draw?:object, onRedraw?:function, onPick?:function}} opts draw 是 store.redraw() 的結果
  */
 export function showReveal(day, onClose, opts = {}) {
   const lamp = day.lamp;
@@ -34,7 +35,6 @@ export function showReveal(day, onClose, opts = {}) {
 
   const all = S.lamps();
   const index = all.findIndex((d) => d.date === day.date) + 1;
-  const sameForm = all.filter((d) => d.lamp.form === lamp.form).length;
   const streak = S.streakEndingAt(day.date);
 
   const { voice, line } = sayingFor(S.statsOf(day), { streak, gapDays: S.gapDays() });
@@ -52,17 +52,10 @@ export function showReveal(day, onClose, opts = {}) {
         <div class="tiny" style="margin-top:7px;letter-spacing:.04em">${draw ? `今天的第 ${day.draws} 抽` : '合成了一盞燈'}</div>
       </div>
 
-      <div class="reveal-glow">${renderLamp(lamp, { size: 150 })}</div>
-
-      <div class="reveal-name" style="margin-top:2px">${esc(lamp.name)}</div>
-
-      <div class="tags">
-        <span class="tag rare">${TIER_LABEL[lamp.tier]}${sameForm > 1 ? ` · 第 ${sameForm} 次遇見` : ' · 初次遇見'}</span>
-        <span class="tag info">${FLAMES[lamp.flame].name} · ${BOWLS[lamp.bowl].name}${GILT_LABEL[lamp.tier] ? ` · ${GILT_LABEL[lamp.tier]}` : ''}</span>
-      </div>
+      <div data-stage>${stageHTML(day, all)}</div>
     </div>
 
-    ${draw ? drawCard(draw) : `
+    ${draw ? pickCard(day, draw) : `
     <section class="card" style="margin:26px var(--gutter) 0;animation:fade-up .5s .7s both">
       <div class="row">
         ${voice.art(38)}
@@ -94,40 +87,57 @@ export function showReveal(day, onClose, opts = {}) {
       onClose?.();
     }));
     el.querySelector('[data-again]')?.addEventListener('click', () => opts.onRedraw?.());
+
+    // 換一盞：就地重畫那盞大的和候選列，不要關掉重開——
+    // 關掉重開會把整段進場動畫再跑一次，像出了什麼事。
+    bindPicks(el, () => {
+      const now = S.getDay();
+      el.querySelector('[data-stage]').innerHTML = stageHTML(now, all);
+      const card = el.querySelector('[data-picks-card]');
+      if (card) card.innerHTML = pickCardInner(now, draw);
+      bindPicks(el, () => {});   // 新畫出來的按鈕要重新接
+      opts.onPick?.();
+    });
     el.querySelector('[data-share]')?.addEventListener('click', (e) => doShare(day, e.currentTarget));
   });
 }
 
-/**
- * 抽完的結果，換沒換都據實講。
- *
- * 抽到常見的也照樣講出來——瞞著只說「留著原本那盞」會讓人以為
- * 按鈕壞了。它本來就是運氣，只是這裡的運氣不會往下。
- */
-function drawCard(draw) {
-  const { drawn, before } = draw;
-  const of = (l) => `「${FORMS[l.form].name}」（${TIER_LABEL[l.tier]}）`;
+/** 那盞大的，連同名字和標籤。換燈的時候整塊重畫。 */
+function stageHTML(day, all) {
+  const lamp = day.lamp;
+  const sameForm = all.filter((d) => d.lamp.form === lamp.form).length;
+  return `
+    <div class="reveal-glow">${renderLamp(lamp, { size: 150 })}</div>
 
-  const said = draw.kept
-    ? `這次抽到${of(drawn)}，比原本的${of(before)}少見，換上了。`
-    : drawn.form === before.form
-      ? `又抽到同一盞${of(drawn)}。`
-      : TIER_RANK[drawn.tier] === TIER_RANK[before.tier]
-        ? `這次抽到${of(drawn)}，跟原本的「${FORMS[before.form].name}」一樣${TIER_LABEL[before.tier]}，留著原本那盞。`
-        : `這次抽到${of(drawn)}，原本的${of(before)}比較少見，留著原本那盞。`;
+    <div class="reveal-name" style="margin-top:2px">${esc(lamp.name)}</div>
+
+    <div class="tags">
+      <span class="tag rare">${TIER_LABEL[lamp.tier]}${sameForm > 1 ? ` · 第 ${sameForm} 次遇見` : ' · 初次遇見'}</span>
+      <span class="tag info">${FLAMES[lamp.flame].name} · ${BOWLS[lamp.bowl].name}${GILT_LABEL[lamp.tier] ? ` · ${GILT_LABEL[lamp.tier]}` : ''}</span>
+    </div>`;
+}
+
+/**
+ * 抽完之後選一盞。
+ *
+ * 抽到常見的也照樣並排擺出來——瞞著只留下好的會讓人以為按鈕壞了。
+ * 它本來就是運氣，只是現在抽到的不會互相取代。
+ */
+function pickCardInner(day, draw) {
+  const drawn = draw.drawn;
+  const same = day.pool.filter((l) => l.form === drawn.form).length > 1;
+  const said = same
+    ? `又抽到「${FORMS[drawn.form].name}」（${TIER_LABEL[drawn.tier]}）。`
+    : `這次抽到「${FORMS[drawn.form].name}」（${TIER_LABEL[drawn.tier]}），已經換上了。`;
 
   return `
-    <section class="card" style="margin:26px var(--gutter) 0;animation:fade-up .5s .5s both">
-      <div class="card-title">${draw.kept ? '換上了新的一盞' : '留著原本那盞'}</div>
-      <p class="small" style="margin-top:8px;line-height:1.9">${said}</p>
-      <p class="small" style="margin-top:8px;color:var(--faint)">
-        ${draw.left > 0
-          ? `還可以抽 ${draw.left} 次。`
-          : S.entriesLeft(S.getDay()) > 0
-            ? '抽完了。再寫一則就再多一次。'
-            : '今天三則都寫了，三次也抽完了。'}
-      </p>
-    </section>`;
+    <div class="card-title">選一盞來供</div>
+    <p class="small" style="margin-top:6px">${said}不喜歡的話點旁邊那盞換回去，今天隨時可以改。</p>
+    <div style="margin-top:13px">${picksHTML(day)}</div>`;
+}
+
+function pickCard(day, draw) {
+  return `<section class="card" data-picks-card style="margin:26px var(--gutter) 0;animation:fade-up .5s .5s both">${pickCardInner(day, draw)}</section>`;
 }
 
 /** 分享：畫成一張圖，善行是主角。 */

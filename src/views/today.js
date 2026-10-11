@@ -13,6 +13,7 @@ import * as SB from '../supabase.js';
 import { esc, icon, sheet, closeSheet, toast } from '../ui.js';
 import { renderLamp } from '../lamp.js';
 import { showReveal } from './reveal.js';
+import { picksHTML, bindPicks } from './picks.js';
 import { showMyDay } from './lampcard.js';
 import { DEFAULT_SUTRA, MAX_ENTRIES_PER_DAY, isOnlineMode } from '../config.js';
 
@@ -70,6 +71,10 @@ export function render(root, go) {
   });
 
   root.querySelector('[data-redraw]')?.addEventListener('click', () => doRedraw(go));
+  bindPicks(root, () => {
+    republishToday();
+    go('today');
+  });
   root.querySelector('[data-share-to]')?.addEventListener('click', () => openShare(go));
 
   root.querySelector('[data-show-lamp]')?.addEventListener('click', () => {
@@ -145,7 +150,7 @@ function joyRow(day, c) {
  * 最該屬於你的那一下反而是系統按的。
  *
  * 現在寫下去燈就亮了，這張卡的主角變成「再抽一次」：
- * 補寫一則就多一次機會，而且只往上，晚點寫不會虧。
+ * 補寫一則就多一次機會，而且抽到的都留著當候選，晚點寫不會虧。
  */
 function actionsCard(day, c, left) {
   const kinds = [
@@ -174,20 +179,29 @@ function actionsCard(day, c, left) {
   }
 
   const draws = S.drawsLeft(day);
-  if (draws === 0 && left === 0) {
+  const picks = picksHTML(day);
+
+  // 抽完了、也寫滿了、而且只有一盞——這張卡沒事做了
+  if (draws === 0 && left === 0 && !picks) {
     return `<div class="small center" style="padding:2px 10px">今天三則都寫了，三次也抽完了。</div>`;
   }
 
   const nudge = draws > 0
-    ? '只會往上：抽到比較難得的才換，抽到普通的就留著現在這盞。'
+    ? '抽到的都留著，所以再抽只會多一個選擇，不會弄丟現在這盞。'
     : '再寫一則，就多一次抽的機會。不寫也沒關係，燈已經亮著了。';
 
   return `
     <section class="card">
+      ${picks ? `
+        <div class="card-title">今天供哪一盞</div>
+        <p class="small" style="margin-top:6px">點一下就換，今天隨時可以改。</p>
+        <div style="margin-top:13px">${picks}</div>
+      ` : ''}
+
       ${draws > 0 ? `
-        <button class="btn btn-full" data-redraw>再抽一次${draws > 1 ? ` · 還有 ${draws} 次` : ''}</button>
+        <button class="btn ${picks ? 'ghost ' : ''}btn-full" style="margin-top:${picks ? '15px' : '0'}" data-redraw>再抽一次${draws > 1 ? ` · 還有 ${draws} 次` : ''}</button>
         <div class="small" style="margin-top:10px">${nudge}</div>
-      ` : `
+      ` : picks ? '' : `
         <div class="card-title">還想寫什麼</div>
         <p class="small" style="margin-top:7px">${nudge}</p>
       `}
@@ -441,18 +455,27 @@ function applyShare(groupIds, go, reveal) {
 
 /* ── 再抽一次 ──
  *
- * 只往上。補寫一則是多一次機會，不是拿已經到手的燈去賭——
- * 不然就會有人為了不弄丟難得的燈而不敢再寫，那就本末倒置了。
+ * 抽到的留著當候選，由人決定供哪一盞。
+ * 原本是「只往上換」，用意是別讓人為了保住難得的燈而不敢再寫；
+ * 那個保證現在更強：寫越多候選越多，不可能變差，而且難得不等於
+ * 喜歡——有人就是想供那盞樸素的。
  */
+
+/** 換了燈之後，群裡那盞也要跟著換。 */
+function republishToday() {
+  const day = S.getDay();
+  if (day.isPublic && isOnlineMode()) {
+    SB.publishLamp(day, S.shareTargets()).catch(() => {});
+  }
+}
 
 function doRedraw(go) {
   const r = S.redraw();
   if (!r) return;
 
-  const day = S.getDay();
-  if (day.isPublic && isOnlineMode()) {
-    SB.publishLamp(day, S.shareTargets()).catch(() => {});
-  }
-
-  showReveal(day, () => go('today'), { draw: r, onRedraw: () => doRedraw(go) });
+  showReveal(S.getDay(), () => go('today'), {
+    draw: r,
+    onRedraw: () => doRedraw(go),
+    onPick: republishToday,
+  });
 }
