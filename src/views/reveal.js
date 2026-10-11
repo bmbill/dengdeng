@@ -110,6 +110,8 @@ function stageHTML(day, all) {
     <div class="reveal-glow">${renderLamp(lamp, { size: 150 })}</div>
 
     <div class="reveal-name" style="margin-top:2px">${esc(lamp.name)}</div>
+    ${lamp.name === FORMS[lamp.form].name ? '' : `
+      <div class="tiny" style="margin-top:4px">形制：${esc(FORMS[lamp.form].name)}</div>`}
 
     <div class="tags">
       <span class="tag rare">${TIER_LABEL[lamp.tier]}${sameForm > 1 ? ` · 第 ${sameForm} 次遇見` : ' · 初次遇見'}</span>
